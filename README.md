@@ -43,14 +43,17 @@ A premier 10-foot Electronic Programme Guide (EPG) built in **Kotlin** with **Je
 
 ---
 
-## Installing on Android TV / Google TV
+## Download & Installation
 
-The debug APK has been compiled and is ready at:
-```bash
-app/build/outputs/apk/debug/app-debug.apk
-```
+### 📥 1. Download Release APK (Easiest)
+Download the latest ready-to-install release APK directly from GitHub Releases:
+👉 **[Download Latest APK from GitHub Releases](https://github.com/andrewpmoore/LiveTv/releases/latest)**
 
-### Install via ADB (Network or USB):
+Transfer the downloaded APK to your Android TV (via USB flash drive, [Send Files to TV](https://play.google.com/store/apps/details?id=com.yablio.sendfilestotv), or cloud storage) and open it with a file manager to install.
+
+---
+
+### 💻 2. Install via ADB (Network or USB)
 1. Enable **Developer Options** and **ADB Debugging** on your Android TV device:
    - Go to `Settings > Device Preferences > About > Build` and click **Build** 7 times.
    - Go to `Settings > Device Preferences > Developer Options` and enable `Network Debugging` (or `USB Debugging`).

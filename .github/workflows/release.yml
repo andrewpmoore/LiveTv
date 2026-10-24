@@ -1,0 +1,76 @@
+name: Release APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag (e.g. v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build & Release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Release APK
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Determine Tag Name
+        id: tag_info
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag_name }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+      - name: Prepare Release Asset
+        run: |
+          mkdir -p release-artifacts
+          cp app/build/outputs/apk/release/app-release.apk release-artifacts/LiveTv-${{ steps.tag_info.outputs.tag }}.apk
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag_info.outputs.tag }}
+          name: LiveTV ${{ steps.tag_info.outputs.tag }}
+          files: release-artifacts/*.apk
+          body: |
+            ### LiveTV for Android TV / Google TV (${{ steps.tag_info.outputs.tag }})
+
+            Download the pre-compiled APK below to install on your Android TV or Google TV device.
+
+            #### Key Features:
+            - Complete 24-hour linear EPG for UK free-to-air channels (BBC, ITV, Channel 4, Channel 5, U/UKTV).
+            - Real-time now/next guide and dynamic hero detail pane with broadcast metadata.
+            - Direct deep linking into live channel playback across broadcaster apps.
+            - 10-foot TV UI optimized for D-pad remote controls.
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
