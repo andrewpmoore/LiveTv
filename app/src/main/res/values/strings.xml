@@ -1,0 +1,26 @@
+<resources>
+    <string name="app_name">Live TV</string>
+    <string name="filter_all">All Channels</string>
+    <string name="filter_bbc">BBC iPlayer</string>
+    <string name="filter_itv">ITVX</string>
+    <string name="filter_c4">Channel 4</string>
+    <string name="filter_c5">Channel 5</string>
+    <string name="filter_u">U (UKTV)</string>
+
+    <string name="action_watch_live">Watch Live</string>
+    <string name="action_refresh">Refresh Guide</string>
+    <string name="action_now">Jump to Now</string>
+    <string name="live_badge">LIVE NOW</string>
+    <string name="upcoming_badge">UPCOMING</string>
+    <string name="hd_badge">HD</string>
+    <string name="new_badge">NEW</string>
+
+    <string name="app_not_installed_title">App Not Installed</string>
+    <string name="app_not_installed_message">%1$s is not installed on this Android TV device. Would you like to install it from the Google Play Store?</string>
+    <string name="install_button">Install from Play Store</string>
+    <string name="cancel_button">Cancel</string>
+
+    <!-- Accessibility Service / Macro Automation -->
+    <string name="accessibility_service_label">Live TV Stream Launcher</string>
+    <string name="accessibility_service_description">Automatically navigates broadcaster apps (BBC iPlayer, ITVX, Channel 4, My5, U) to launch live channels directly.</string>
+</resources>

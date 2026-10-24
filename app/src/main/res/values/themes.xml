@@ -1,0 +1,9 @@
+<resources>
+    <style name="Theme.FreeEPG" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/bg_dark</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:colorPrimary">@color/accent_cyan</item>
+    </style>
+</resources>

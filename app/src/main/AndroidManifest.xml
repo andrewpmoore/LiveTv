@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesCondition" />
+
+    <!-- Android TV feature declarations -->
+    <uses-feature
+        android:name="android.software.leanback"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.touchscreen"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.banner"
+        android:required="false" />
+
+    <!-- Queries to inspect installed broadcaster apps and trigger deep links -->
+    <queries>
+        <!-- BBC iPlayer -->
+        <package android:name="bbc.iplayer.android" />
+        <package android:name="uk.co.bbc.iplayer" />
+        <package android:name="com.nvidia.bbciplayer" />
+        <package android:name="uk.co.bbc.iplayertv" />
+        <package android:name="uk.co.bbc.android.iplayer" />
+        <!-- ITVX -->
+        <package android:name="air.ITVMobilePlayer" />
+        <package android:name="com.itv.trinty" />
+        <package android:name="com.itv.ukplayer" />
+        <package android:name="air.itv.hub" />
+        <package android:name="com.itv.hub" />
+        <!-- Channel 4 -->
+        <package android:name="com.channel4.ondemand" />
+        <package android:name="com.channel4.all4.androidtv" />
+        <package android:name="uk.c4.white" />
+        <!-- Channel 5 / My5 -->
+        <package android:name="com.channel5.my5" />
+        <package android:name="com.channel5.my5.androidtv" />
+        <package android:name="com.my5.tv" />
+        <!-- U (UKTV Play) -->
+        <package android:name="uk.co.uktv.dave" />
+        <package android:name="com.uktv.uktvplay" />
+        <package android:name="uk.co.uktv.play" />
+
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="bbc" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="bbciplayer" />
+        </intent>
+    </queries>
+
+    <application
+        android:name=".FreeEpgApp"
+        android:allowBackup="true"
+        android:banner="@drawable/banner"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.FreeEPG">
+
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:banner="@drawable/banner"
+            android:icon="@mipmap/ic_launcher"
+            android:roundIcon="@mipmap/ic_launcher_round"
+            android:configChanges="orientation|keyboardHidden|screenSize|screenLayout"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.FreeEPG">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <!-- Leanback launcher for Android TV home screen -->
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- EPG Macro Accessibility Service for automated live stream navigation -->
+        <service
+            android:name=".service.EpgMacroAccessibilityService"
+            android:exported="true"
+            android:label="@string/accessibility_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/epg_macro_service_config" />
+        </service>
+    </application>
+
+</manifest>
