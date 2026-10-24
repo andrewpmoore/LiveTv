@@ -23,7 +23,7 @@ import kotlinx.coroutines.launch
 data class EpgUiState(
     val selectedBroadcaster: Broadcaster? = null,
     val enabledBroadcasters: Set<Broadcaster> = SettingsRepository.DEFAULT_BROADCASTERS,
-    val channelSortOrder: ChannelSortOrder = ChannelSortOrder.PROVIDER,
+    val channelSortOrder: ChannelSortOrder = ChannelSortOrder.NUMBER,
     val channels: List<Channel> = Channel.ALL_CHANNELS,
     val scheduleMap: Map<String, List<Programme>> = emptyMap(),
     val focusedProgramme: Programme? = null,
@@ -34,6 +34,7 @@ data class EpgUiState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val showSettingsDialog: Boolean = false,
+    val settingsFocusRequestId: Int = 0,
     val isMacroEnabled: Boolean = true,
     val isAccessibilityServiceActive: Boolean = false,
     val notInstalledDialog: LaunchResult.AppNotInstalled? = null
@@ -161,6 +162,11 @@ class EpgViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update {
             it.copy(
                 showSettingsDialog = showDialog ?: it.showSettingsDialog,
+                settingsFocusRequestId = if (showDialog == null && it.showSettingsDialog) {
+                    it.settingsFocusRequestId + 1
+                } else {
+                    it.settingsFocusRequestId
+                },
                 isAccessibilityServiceActive = isServiceActive,
                 isMacroEnabled = isMacroPref && isServiceActive
             )

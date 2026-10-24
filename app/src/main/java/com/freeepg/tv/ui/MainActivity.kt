@@ -188,6 +188,7 @@ fun MainEpgScreen(viewModel: EpgViewModel) {
         SettingsDialog(
             enabledBroadcasters = state.enabledBroadcasters,
             channelSortOrder = state.channelSortOrder,
+            focusRequestId = state.settingsFocusRequestId,
             isMacroEnabled = state.isMacroEnabled,
             isAccessibilityServiceActive = state.isAccessibilityServiceActive,
             onToggleBroadcaster = { broadcaster ->

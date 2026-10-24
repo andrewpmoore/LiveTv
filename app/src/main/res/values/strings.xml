@@ -20,6 +20,6 @@
     <string name="cancel_button">Cancel</string>
 
     <!-- Accessibility Service / Macro Automation -->
-    <string name="accessibility_service_label">Live TV Stream Launcher</string>
+    <string name="accessibility_service_label">Live TV</string>
     <string name="accessibility_service_description">Automatically navigates broadcaster apps (BBC iPlayer, ITVX, Channel 4, My5) to launch live channels directly.</string>
 </resources>

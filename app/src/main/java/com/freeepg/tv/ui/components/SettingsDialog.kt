@@ -60,6 +60,7 @@ import com.freeepg.tv.ui.theme.TextTertiary
 fun SettingsDialog(
     enabledBroadcasters: Set<Broadcaster>,
     channelSortOrder: ChannelSortOrder,
+    focusRequestId: Int,
     isMacroEnabled: Boolean,
     isAccessibilityServiceActive: Boolean,
     onToggleBroadcaster: (Broadcaster) -> Unit,
@@ -70,15 +71,29 @@ fun SettingsDialog(
 ) {
     BackHandler { onDismiss() }
 
-    val firstItemFocusRequester = remember { FocusRequester() }
+    val selectedSortOptionFocusRequester = remember { FocusRequester() }
+    val accessibilitySettingsFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
         for (attempt in 1..10) {
             kotlinx.coroutines.delay(60)
             try {
-                firstItemFocusRequester.requestFocus()
+                if (selectedSortOptionFocusRequester.requestFocus()) break
             } catch (_: Exception) {
                 // Retry while the dialog's first option is being composed.
+            }
+        }
+    }
+
+    LaunchedEffect(focusRequestId) {
+        if (focusRequestId > 0) {
+            for (attempt in 1..10) {
+                kotlinx.coroutines.delay(100)
+                try {
+                    if (accessibilitySettingsFocusRequester.requestFocus()) break
+                } catch (_: Exception) {
+                    // Retry while the dialog window and accessibility row regain focusability.
+                }
             }
         }
     }
@@ -194,8 +209,8 @@ fun SettingsDialog(
                                 sortOrder = sortOrder,
                                 isSelected = sortOrder == channelSortOrder,
                                 onSelect = { onChannelSortOrderSelected(sortOrder) },
-                                modifier = if (sortOrder == ChannelSortOrder.values().first()) {
-                                    Modifier.focusRequester(firstItemFocusRequester)
+                                modifier = if (sortOrder == channelSortOrder) {
+                                    Modifier.focusRequester(selectedSortOptionFocusRequester)
                                 } else Modifier
                             )
                         }
@@ -251,7 +266,8 @@ fun SettingsDialog(
                         item {
                             AccessibilitySetupRow(
                                 isServiceActive = isAccessibilityServiceActive,
-                                onClick = onOpenAccessibilitySettings
+                                onClick = onOpenAccessibilitySettings,
+                                focusRequester = accessibilitySettingsFocusRequester
                             )
                         }
                     }
@@ -619,7 +635,8 @@ private fun MacroToggleRow(
 @Composable
 private fun AccessibilitySetupRow(
     isServiceActive: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    focusRequester: FocusRequester
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused = interactionSource.collectIsFocusedAsState().value
@@ -655,6 +672,7 @@ private fun AccessibilitySetupRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .focusRequester(focusRequester)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,

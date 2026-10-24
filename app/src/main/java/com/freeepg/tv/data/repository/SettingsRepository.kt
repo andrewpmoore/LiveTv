@@ -72,9 +72,9 @@ class SettingsRepository(context: Context) {
     }
 
     fun getChannelSortOrder(): ChannelSortOrder {
-        val storedValue = prefs.getString(KEY_CHANNEL_SORT_ORDER, ChannelSortOrder.PROVIDER.name)
+        val storedValue = prefs.getString(KEY_CHANNEL_SORT_ORDER, ChannelSortOrder.NUMBER.name)
         return ChannelSortOrder.values().firstOrNull { it.name == storedValue }
-            ?: ChannelSortOrder.PROVIDER
+            ?: ChannelSortOrder.NUMBER
     }
 
     fun setChannelSortOrder(sortOrder: ChannelSortOrder) {
