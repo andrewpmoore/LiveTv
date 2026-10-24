@@ -405,6 +405,68 @@ fun HeroProgrammePane(
                     }
                 }
             }
+        } else if (channel != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp, vertical = 18.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (!channel.logoUrl.isNullOrBlank()) {
+                            AsyncImage(
+                                model = channel.logoUrl,
+                                contentDescription = channel.name,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier
+                                    .height(26.dp)
+                                    .width(48.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(Color(0x22FFFFFF))
+                                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                        }
+                        Text(
+                            text = "${channel.name} • ${channel.channelNumber}",
+                            color = TextPrimary.copy(alpha = 0.85f),
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 12.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Off air",
+                        color = TextPrimary,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .width(210.dp)
+                        .height(118.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(8.dp))
+                        .background(
+                            Brush.radialGradient(
+                                listOf(channel.broadcaster.brandColor.copy(alpha = 0.22f), Color(0xFF101724))
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LiveTv,
+                        contentDescription = null,
+                        tint = channel.broadcaster.brandColor.copy(alpha = 0.8f),
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+            }
         } else {
             // Placeholder when no programme has focus
             Column(

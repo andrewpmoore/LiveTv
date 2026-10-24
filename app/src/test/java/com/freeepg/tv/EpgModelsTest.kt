@@ -21,7 +21,7 @@ class EpgModelsTest {
         assertTrue(broadcasters.contains(Broadcaster.ITV))
         assertTrue(broadcasters.contains(Broadcaster.CHANNEL_4))
         assertTrue(broadcasters.contains(Broadcaster.CHANNEL_5))
-        assertTrue(broadcasters.contains(Broadcaster.U))
+        assertEquals(4, broadcasters.size)
     }
 
     @Test
@@ -30,13 +30,11 @@ class EpgModelsTest {
         val itvChannels = Channel.ALL_CHANNELS.filter { it.broadcaster == Broadcaster.ITV }
         val c4Channels = Channel.ALL_CHANNELS.filter { it.broadcaster == Broadcaster.CHANNEL_4 }
         val c5Channels = Channel.ALL_CHANNELS.filter { it.broadcaster == Broadcaster.CHANNEL_5 }
-        val uChannels = Channel.ALL_CHANNELS.filter { it.broadcaster == Broadcaster.U }
 
         assertTrue("Expected at least 5 BBC channels", bbcChannels.size >= 5)
         assertTrue("Expected at least 4 ITV channels", itvChannels.size >= 4)
         assertTrue("Expected at least 4 Channel 4 channels", c4Channels.size >= 4)
         assertTrue("Expected at least 4 Channel 5 channels", c5Channels.size >= 4)
-        assertTrue("Expected at least 4 U channels", uChannels.size >= 4)
     }
 
     @Test

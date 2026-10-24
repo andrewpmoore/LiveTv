@@ -48,6 +48,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.freeepg.tv.data.model.Broadcaster
 import com.freeepg.tv.data.model.Channel
+import com.freeepg.tv.data.repository.ChannelSortOrder
 import com.freeepg.tv.ui.theme.AccentCyan
 import com.freeepg.tv.ui.theme.AccentLive
 import com.freeepg.tv.ui.theme.BorderFocused
@@ -58,9 +59,11 @@ import com.freeepg.tv.ui.theme.TextTertiary
 @Composable
 fun SettingsDialog(
     enabledBroadcasters: Set<Broadcaster>,
+    channelSortOrder: ChannelSortOrder,
     isMacroEnabled: Boolean,
     isAccessibilityServiceActive: Boolean,
     onToggleBroadcaster: (Broadcaster) -> Unit,
+    onChannelSortOrderSelected: (ChannelSortOrder) -> Unit,
     onToggleMacro: () -> Unit,
     onOpenAccessibilitySettings: () -> Unit,
     onDismiss: () -> Unit
@@ -70,10 +73,14 @@ fun SettingsDialog(
     val firstItemFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(120)
-        try {
-            firstItemFocusRequester.requestFocus()
-        } catch (_: Exception) {}
+        for (attempt in 1..10) {
+            kotlinx.coroutines.delay(60)
+            try {
+                firstItemFocusRequester.requestFocus()
+            } catch (_: Exception) {
+                // Retry while the dialog's first option is being composed.
+            }
+        }
     }
 
     Dialog(
@@ -168,9 +175,31 @@ fun SettingsDialog(
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(310.dp),
+                            .height(380.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        item {
+                            Text(
+                                text = "CHANNEL ORDER",
+                                color = AccentCyan.copy(alpha = 0.9f),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.8.sp,
+                                modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 4.dp)
+                            )
+                        }
+
+                        items(ChannelSortOrder.values().toList()) { sortOrder ->
+                            ChannelSortOptionRow(
+                                sortOrder = sortOrder,
+                                isSelected = sortOrder == channelSortOrder,
+                                onSelect = { onChannelSortOrderSelected(sortOrder) },
+                                modifier = if (sortOrder == ChannelSortOrder.values().first()) {
+                                    Modifier.focusRequester(firstItemFocusRequester)
+                                } else Modifier
+                            )
+                        }
+
                         // Section 1 Header: Broadcasters
                         item {
                             Text(
@@ -185,7 +214,6 @@ fun SettingsDialog(
 
                         // Broadcaster Options List
                         items(Broadcaster.values()) { broadcaster ->
-                            val index = Broadcaster.values().indexOf(broadcaster)
                             val isEnabled = broadcaster in enabledBroadcasters
                             val channelsCount = Channel.ALL_CHANNELS.count { it.broadcaster == broadcaster }
 
@@ -194,7 +222,6 @@ fun SettingsDialog(
                                 isEnabled = isEnabled,
                                 channelsCount = channelsCount,
                                 onToggle = { onToggleBroadcaster(broadcaster) },
-                                modifier = if (index == 0) Modifier.focusRequester(firstItemFocusRequester) else Modifier
                             )
                         }
 
@@ -252,6 +279,51 @@ fun SettingsDialog(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ChannelSortOptionRow(
+    sortOrder: ChannelSortOrder,
+    isSelected: Boolean,
+    onSelect: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused = interactionSource.collectIsFocusedAsState().value
+    val outline = if (isFocused) BorderFocused else Color(0x1FFFFFFF)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(modifier)
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (isFocused) Color(0xFF1E283C) else Color(0xFF111726))
+            .border(1.5.dp, outline, RoundedCornerShape(10.dp))
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onSelect
+            )
+            .focusable(interactionSource = interactionSource)
+            .padding(horizontal = 16.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = sortOrder.label,
+            color = if (isSelected) TextPrimary else TextSecondary,
+            fontSize = 13.5.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+            modifier = Modifier.weight(1f)
+        )
+        if (isSelected) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = "Selected",
+                tint = AccentCyan,
+                modifier = Modifier.size(18.dp)
+            )
         }
     }
 }
@@ -499,7 +571,7 @@ private fun MacroToggleRow(
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = if (isServiceActive)
-                    "Inspects broadcaster menus to launch live channel streams directly"
+                    "Navigates broadcaster apps to the requested live channel when a direct link is unavailable"
                 else
                     "Auto-navigation is off until Accessibility Service is enabled in settings",
                 color = if (isServiceActive) TextTertiary else Color(0xFFFFB74D),

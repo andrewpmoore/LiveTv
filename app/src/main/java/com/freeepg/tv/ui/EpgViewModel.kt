@@ -7,6 +7,7 @@ import com.freeepg.tv.data.model.Broadcaster
 import com.freeepg.tv.data.model.Channel
 import com.freeepg.tv.data.model.Programme
 import com.freeepg.tv.data.repository.EpgRepository
+import com.freeepg.tv.data.repository.ChannelSortOrder
 import com.freeepg.tv.data.repository.SettingsRepository
 import com.freeepg.tv.deeplink.DeepLinkManager
 import com.freeepg.tv.deeplink.LaunchResult
@@ -22,6 +23,7 @@ import kotlinx.coroutines.launch
 data class EpgUiState(
     val selectedBroadcaster: Broadcaster? = null,
     val enabledBroadcasters: Set<Broadcaster> = SettingsRepository.DEFAULT_BROADCASTERS,
+    val channelSortOrder: ChannelSortOrder = ChannelSortOrder.PROVIDER,
     val channels: List<Channel> = Channel.ALL_CHANNELS,
     val scheduleMap: Map<String, List<Programme>> = emptyMap(),
     val focusedProgramme: Programme? = null,
@@ -54,6 +56,7 @@ class EpgViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(
         EpgUiState(
             enabledBroadcasters = settingsRepository.getEnabledBroadcasters(),
+            channelSortOrder = settingsRepository.getChannelSortOrder(),
             channels = settingsRepository.getFilteredChannels(null)
         )
     )
@@ -125,6 +128,25 @@ class EpgViewModel(application: Application) : AndroidViewModel(application) {
                 channels = filtered,
                 focusedChannel = firstChannel ?: current.focusedChannel,
                 focusedProgramme = liveProg ?: current.focusedProgramme
+            )
+        }
+    }
+
+    fun setChannelSortOrder(sortOrder: ChannelSortOrder) {
+        settingsRepository.setChannelSortOrder(sortOrder)
+        val current = _uiState.value
+        val sortedChannels = settingsRepository.getFilteredChannels(current.selectedBroadcaster, sortOrder)
+        val firstChannel = sortedChannels.firstOrNull()
+        val firstProgramme = firstChannel?.let { channel ->
+            current.scheduleMap[channel.id]?.firstOrNull { it.isLiveNow(current.currentTimeSeconds) }
+        }
+
+        _uiState.update {
+            it.copy(
+                channelSortOrder = sortOrder,
+                channels = sortedChannels,
+                focusedChannel = firstChannel ?: it.focusedChannel,
+                focusedProgramme = firstProgramme
             )
         }
     }
@@ -206,6 +228,15 @@ class EpgViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun onChannelFocused(channel: Channel) {
+        _uiState.update {
+            it.copy(
+                focusedProgramme = null,
+                focusedChannel = channel
+            )
+        }
+    }
+
     /**
      * Handles programme click:
      * Immediately fires the deep-link into the broadcaster app / live stream.
@@ -222,7 +253,12 @@ class EpgViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.update { it.copy(notInstalledDialog = result) }
             }
             is LaunchResult.Failure -> {
-                _uiState.update { it.copy(errorMessage = "Unable to launch ${channel.broadcaster.displayName}") }
+                _uiState.update { it.copy(errorMessage = result.reason) }
+                android.widget.Toast.makeText(
+                    getApplication(),
+                    result.reason,
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
             }
         }
     }

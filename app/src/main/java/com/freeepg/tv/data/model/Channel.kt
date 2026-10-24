@@ -26,14 +26,7 @@ data class Channel(
                 shortName = "BBC One",
                 broadcaster = Broadcaster.BBC,
                 logoUrl = "https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/united-kingdom/bbc-one-uk.png",
-                deepLinkUris = listOf(
-                    "https://www.live.bbctvapps.co.uk/bbcone",
-                    "https://www.live.bbctvapps.co.uk/stream/bbcone",
-                    "https://www.live.bbctvapps.co.uk",
-                    "bbc://iplayer/playback/bbc_one_hd",
-                    "bbciplayer://live/bbcone",
-                    "https://www.bbc.co.uk/iplayer/live/bbcone"
-                ),
+                deepLinkUris = emptyList(),
                 webLiveUrl = "https://www.bbc.co.uk/iplayer/live/bbcone"
             ),
             Channel(
@@ -44,14 +37,7 @@ data class Channel(
                 shortName = "BBC Two",
                 broadcaster = Broadcaster.BBC,
                 logoUrl = "https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/united-kingdom/bbc-two-uk.png",
-                deepLinkUris = listOf(
-                    "https://www.live.bbctvapps.co.uk/bbctwo",
-                    "https://www.live.bbctvapps.co.uk/stream/bbctwo",
-                    "https://www.live.bbctvapps.co.uk",
-                    "bbc://iplayer/playback/bbc_two_hd",
-                    "bbciplayer://live/bbctwo",
-                    "https://www.bbc.co.uk/iplayer/live/bbctwo"
-                ),
+                deepLinkUris = emptyList(),
                 webLiveUrl = "https://www.bbc.co.uk/iplayer/live/bbctwo"
             ),
             Channel(
@@ -62,11 +48,7 @@ data class Channel(
                 shortName = "BBC Three",
                 broadcaster = Broadcaster.BBC,
                 logoUrl = "https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/united-kingdom/bbc-three-uk.png",
-                deepLinkUris = listOf(
-                    "bbc://iplayer/playback/bbc_three_hd",
-                    "bbciplayer://live/bbcthree",
-                    "https://www.bbc.co.uk/iplayer/live/bbcthree"
-                ),
+                deepLinkUris = emptyList(),
                 webLiveUrl = "https://www.bbc.co.uk/iplayer/live/bbcthree"
             ),
             Channel(
@@ -77,11 +59,7 @@ data class Channel(
                 shortName = "BBC Four",
                 broadcaster = Broadcaster.BBC,
                 logoUrl = "https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/united-kingdom/bbc-four-uk.png",
-                deepLinkUris = listOf(
-                    "bbc://iplayer/playback/bbc_four_hd",
-                    "bbciplayer://live/bbcfour",
-                    "https://www.bbc.co.uk/iplayer/live/bbcfour"
-                ),
+                deepLinkUris = emptyList(),
                 webLiveUrl = "https://www.bbc.co.uk/iplayer/live/bbcfour"
             ),
             Channel(
@@ -92,11 +70,7 @@ data class Channel(
                 shortName = "BBC News",
                 broadcaster = Broadcaster.BBC,
                 logoUrl = "https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/united-kingdom/bbc-news-uk.png",
-                deepLinkUris = listOf(
-                    "bbc://iplayer/playback/bbc_news_channel_hd",
-                    "bbciplayer://live/bbcnews",
-                    "https://www.bbc.co.uk/iplayer/live/bbcnews"
-                ),
+                deepLinkUris = emptyList(),
                 webLiveUrl = "https://www.bbc.co.uk/iplayer/live/bbcnews"
             ),
             Channel(
@@ -107,11 +81,7 @@ data class Channel(
                 shortName = "CBBC",
                 broadcaster = Broadcaster.BBC,
                 logoUrl = "https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/united-kingdom/bbc-cbbc-uk.png",
-                deepLinkUris = listOf(
-                    "bbc://iplayer/playback/cbbc_hd",
-                    "bbciplayer://live/cbbc",
-                    "https://www.bbc.co.uk/iplayer/live/cbbc"
-                ),
+                deepLinkUris = emptyList(),
                 webLiveUrl = "https://www.bbc.co.uk/iplayer/live/cbbc"
             ),
             Channel(
@@ -122,11 +92,7 @@ data class Channel(
                 shortName = "CBeebies",
                 broadcaster = Broadcaster.BBC,
                 logoUrl = "https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/united-kingdom/bbc-cbeebies-uk.png",
-                deepLinkUris = listOf(
-                    "bbc://iplayer/playback/cbeebies_hd",
-                    "bbciplayer://live/cbeebies",
-                    "https://www.bbc.co.uk/iplayer/live/cbeebies"
-                ),
+                deepLinkUris = emptyList(),
                 webLiveUrl = "https://www.bbc.co.uk/iplayer/live/cbeebies"
             ),
 
@@ -139,12 +105,8 @@ data class Channel(
                 shortName = "ITV1",
                 broadcaster = Broadcaster.ITV,
                 logoUrl = "https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/united-kingdom/itv-1-uk.png",
-                deepLinkUris = listOf(
-                    "https://www.itv.com/watch/live/itv1",
-                    "itvx://watch/live/itv1",
-                    "https://www.itv.com/watch"
-                ),
-                webLiveUrl = "https://www.itv.com/watch/live/itv1"
+                deepLinkUris = listOf("https://www.itv.com/watch?channel=itv"),
+                webLiveUrl = "https://www.itv.com/watch?channel=itv"
             ),
             Channel(
                 id = "itv2",
@@ -154,12 +116,8 @@ data class Channel(
                 shortName = "ITV2",
                 broadcaster = Broadcaster.ITV,
                 logoUrl = "https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/united-kingdom/itv-2-uk.png",
-                deepLinkUris = listOf(
-                    "https://www.itv.com/watch/live/itv2",
-                    "itvx://watch/live/itv2",
-                    "https://www.itv.com/watch"
-                ),
-                webLiveUrl = "https://www.itv.com/watch/live/itv2"
+                deepLinkUris = listOf("https://www.itv.com/watch?channel=itv2"),
+                webLiveUrl = "https://www.itv.com/watch?channel=itv2"
             ),
             Channel(
                 id = "itv3",
@@ -169,12 +127,8 @@ data class Channel(
                 shortName = "ITV3",
                 broadcaster = Broadcaster.ITV,
                 logoUrl = "https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/united-kingdom/itv-3-uk.png",
-                deepLinkUris = listOf(
-                    "https://www.itv.com/watch/live/itv3",
-                    "itvx://watch/live/itv3",
-                    "https://www.itv.com/watch"
-                ),
-                webLiveUrl = "https://www.itv.com/watch/live/itv3"
+                deepLinkUris = listOf("https://www.itv.com/watch?channel=itv3"),
+                webLiveUrl = "https://www.itv.com/watch?channel=itv3"
             ),
             Channel(
                 id = "itv4",
@@ -184,12 +138,8 @@ data class Channel(
                 shortName = "ITV4",
                 broadcaster = Broadcaster.ITV,
                 logoUrl = "https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/united-kingdom/itv-4-uk.png",
-                deepLinkUris = listOf(
-                    "https://www.itv.com/watch/live/itv4",
-                    "itvx://watch/live/itv4",
-                    "https://www.itv.com/watch"
-                ),
-                webLiveUrl = "https://www.itv.com/watch/live/itv4"
+                deepLinkUris = listOf("https://www.itv.com/watch?channel=itv4"),
+                webLiveUrl = "https://www.itv.com/watch?channel=itv4"
             ),
             Channel(
                 id = "itv_be",
@@ -199,11 +149,10 @@ data class Channel(
                 shortName = "ITVBe",
                 broadcaster = Broadcaster.ITV,
                 logoUrl = "https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/united-kingdom/itv-be-uk.png",
-                deepLinkUris = listOf(
-                    "https://www.itv.com/watch/live/itvbe",
-                    "itvx://watch/live/itvbe"
-                ),
-                webLiveUrl = "https://www.itv.com/watch/live/itvbe"
+                // ITVBe's web route falls back to another live feed in the current ITVX TV app.
+                // Use menu navigation instead of claiming this unverified route selects ITVBe.
+                deepLinkUris = emptyList(),
+                webLiveUrl = "https://www.itv.com/watch?channel=itvbe"
             ),
 
             // === Channel 4 ===
@@ -290,12 +239,8 @@ data class Channel(
                 shortName = "Channel 5",
                 broadcaster = Broadcaster.CHANNEL_5,
                 logoUrl = "https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/united-kingdom/channel-5-uk.png",
-                deepLinkUris = listOf(
-                    "https://www.channel5.com/channel/5",
-                    "my5://live/5",
-                    "https://www.channel5.com"
-                ),
-                webLiveUrl = "https://www.channel5.com"
+                deepLinkUris = emptyList(),
+                webLiveUrl = "https://www.my5.tv/live/channel-5"
             ),
             Channel(
                 id = "c5_action",
@@ -305,11 +250,8 @@ data class Channel(
                 shortName = "5ACTION",
                 broadcaster = Broadcaster.CHANNEL_5,
                 logoUrl = "https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/united-kingdom/5-action-uk.png",
-                deepLinkUris = listOf(
-                    "https://www.channel5.com/channel/5action",
-                    "my5://live/5action"
-                ),
-                webLiveUrl = "https://www.channel5.com"
+                deepLinkUris = emptyList(),
+                webLiveUrl = "https://www.my5.tv/live/5action"
             ),
             Channel(
                 id = "c5_star",
@@ -319,11 +261,8 @@ data class Channel(
                 shortName = "5STAR",
                 broadcaster = Broadcaster.CHANNEL_5,
                 logoUrl = "https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/united-kingdom/5-star-uk.png",
-                deepLinkUris = listOf(
-                    "https://www.channel5.com/channel/5star",
-                    "my5://live/5star"
-                ),
-                webLiveUrl = "https://www.channel5.com"
+                deepLinkUris = emptyList(),
+                webLiveUrl = "https://www.my5.tv/live/5star"
             ),
             Channel(
                 id = "c5_usa",
@@ -333,11 +272,8 @@ data class Channel(
                 shortName = "5 USA",
                 broadcaster = Broadcaster.CHANNEL_5,
                 logoUrl = "https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/united-kingdom/5-usa-uk.png",
-                deepLinkUris = listOf(
-                    "https://www.channel5.com/channel/5usa",
-                    "my5://live/5usa"
-                ),
-                webLiveUrl = "https://www.channel5.com"
+                deepLinkUris = emptyList(),
+                webLiveUrl = "https://www.my5.tv/live/5usa"
             ),
             Channel(
                 id = "c5_drama",
@@ -347,84 +283,8 @@ data class Channel(
                 shortName = "5DRAMA",
                 broadcaster = Broadcaster.CHANNEL_5,
                 logoUrl = "https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/united-kingdom/channel-5-uk.png",
-                deepLinkUris = listOf(
-                    "https://www.channel5.com/channel/5drama",
-                    "my5://live/5drama"
-                ),
-                webLiveUrl = "https://www.channel5.com"
-            ),
-
-            // === U (UKTV Play) ===
-            Channel(
-                id = "u_dave",
-                skySid = "3809",
-                channelNumber = "111",
-                name = "U&Dave HD",
-                shortName = "U&Dave",
-                broadcaster = Broadcaster.U,
-                logoUrl = "https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/united-kingdom/dave-uk.png",
-                deepLinkUris = listOf(
-                    "https://uktvplay.uktv.co.uk/channel/dave",
-                    "uktvplay://channel/dave",
-                    "https://uktvplay.uktv.co.uk"
-                ),
-                webLiveUrl = "https://uktvplay.uktv.co.uk/channel/dave"
-            ),
-            Channel(
-                id = "u_drama",
-                skySid = "2612",
-                channelNumber = "143",
-                name = "U&Drama",
-                shortName = "U&Drama",
-                broadcaster = Broadcaster.U,
-                logoUrl = "https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/united-kingdom/drama-uk.png",
-                deepLinkUris = listOf(
-                    "https://uktvplay.uktv.co.uk/channel/drama",
-                    "uktvplay://channel/drama"
-                ),
-                webLiveUrl = "https://uktvplay.uktv.co.uk/channel/drama"
-            ),
-            Channel(
-                id = "u_yesterday",
-                skySid = "2305",
-                channelNumber = "155",
-                name = "U&Yesterday",
-                shortName = "U&Yesterday",
-                broadcaster = Broadcaster.U,
-                logoUrl = "https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/united-kingdom/yesterday-uk.png",
-                deepLinkUris = listOf(
-                    "https://uktvplay.uktv.co.uk/channel/yesterday",
-                    "uktvplay://channel/yesterday"
-                ),
-                webLiveUrl = "https://uktvplay.uktv.co.uk/channel/yesterday"
-            ),
-            Channel(
-                id = "u_w",
-                skySid = "2617",
-                channelNumber = "132",
-                name = "U&W",
-                shortName = "U&W",
-                broadcaster = Broadcaster.U,
-                logoUrl = "https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/united-kingdom/u-and-w-uk.png",
-                deepLinkUris = listOf(
-                    "https://uktvplay.uktv.co.uk/channel/w",
-                    "uktvplay://channel/w"
-                ),
-                webLiveUrl = "https://uktvplay.uktv.co.uk/channel/w"
-            ),
-            Channel(
-                id = "u_alibi",
-                skySid = "3825",
-                channelNumber = "109",
-                name = "U&Alibi HD",
-                shortName = "U&Alibi",
-                broadcaster = Broadcaster.U,
-                logoUrl = "https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/united-kingdom/alibi-uk.png",
-                deepLinkUris = listOf(
-                    "https://uktvplay.uktv.co.uk/channel/alibi",
-                    "uktvplay://channel/alibi"
-                ),
-                webLiveUrl = "https://uktvplay.uktv.co.uk/channel/alibi"
+                deepLinkUris = emptyList(),
+                webLiveUrl = "https://www.my5.tv/live/5drama"
             )
         )
     }

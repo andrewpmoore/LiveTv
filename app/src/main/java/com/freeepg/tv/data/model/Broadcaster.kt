@@ -32,7 +32,16 @@ enum class Broadcaster(
         brandColor = Color(0xFFFFD500),
         brandGradient = listOf(Color(0xFFFFE033), Color(0xFFFF9E00)),
         primaryPackage = "air.ITVMobilePlayer",
-        alternativePackages = listOf("com.itv.trinty", "com.itv.ukplayer", "air.itv.hub", "com.itv.hub"),
+        alternativePackages = listOf(
+            "com.itv.tenft.itvhub",
+            "com.itv.itvx",
+            "com.itv.itvplayer",
+            "com.itv.hub",
+            "com.itv.androidtv",
+            "com.itv.trinty",
+            "com.itv.ukplayer",
+            "air.itv.hub"
+        ),
         defaultWebBaseUrl = "https://www.itv.com"
     ),
     CHANNEL_4(
@@ -54,19 +63,13 @@ enum class Broadcaster(
         brandColor = Color(0xFFD500F9),
         brandGradient = listOf(Color(0xFFEA39FF), Color(0xFFAA00FF)),
         primaryPackage = "com.channel5.my5",
-        alternativePackages = listOf("com.channel5.my5.androidtv", "com.my5.tv"),
+        alternativePackages = listOf(
+            "com.mobileiq.demand5",
+            "com.channel5.my5.androidtv",
+            "com.my5.tv",
+            "com.my5.androidtv"
+        ),
         defaultWebBaseUrl = "https://www.channel5.com"
-    ),
-    U(
-        id = "u",
-        displayName = "U (UKTV)",
-        shortName = "U",
-        badgeText = "U",
-        brandColor = Color(0xFF00E5FF),
-        brandGradient = listOf(Color(0xFF33ECFF), Color(0xFF0091EA)),
-        primaryPackage = "uk.co.uktv.dave",
-        alternativePackages = listOf("com.uktv.uktvplay", "uk.co.uktv.play"),
-        defaultWebBaseUrl = "https://uktvplay.uktv.co.uk"
     );
 
     val allPackages: List<String>

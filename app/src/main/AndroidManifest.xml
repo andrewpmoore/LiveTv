@@ -28,26 +28,32 @@
         <package android:name="uk.co.bbc.android.iplayer" />
         <!-- ITVX -->
         <package android:name="air.ITVMobilePlayer" />
+        <package android:name="com.itv.tenft.itvhub" />
+        <package android:name="com.itv.itvx" />
+        <package android:name="com.itv.itvplayer" />
+        <package android:name="com.itv.hub" />
+        <package android:name="com.itv.androidtv" />
         <package android:name="com.itv.trinty" />
         <package android:name="com.itv.ukplayer" />
         <package android:name="air.itv.hub" />
-        <package android:name="com.itv.hub" />
         <!-- Channel 4 -->
         <package android:name="com.channel4.ondemand" />
         <package android:name="com.channel4.all4.androidtv" />
         <package android:name="uk.c4.white" />
         <!-- Channel 5 / My5 -->
         <package android:name="com.channel5.my5" />
+        <package android:name="com.mobileiq.demand5" />
         <package android:name="com.channel5.my5.androidtv" />
         <package android:name="com.my5.tv" />
-        <!-- U (UKTV Play) -->
-        <package android:name="uk.co.uktv.dave" />
-        <package android:name="com.uktv.uktvplay" />
-        <package android:name="uk.co.uktv.play" />
+        <package android:name="com.my5.androidtv" />
 
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="http" />
         </intent>
         <intent>
             <action android:name="android.intent.action.VIEW" />
@@ -56,6 +62,30 @@
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="bbciplayer" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="itv" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="itvx" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="channel4" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="all4" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="my5" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="demand5" />
         </intent>
     </queries>
 

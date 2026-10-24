@@ -3,7 +3,10 @@ package com.freeepg.tv.ui.components
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -33,8 +36,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -71,6 +80,7 @@ fun EpgGrid(
     totalSlots: Int = 52, // 26 hours of 30-min slots
     horizontalScrollState: ScrollState,
     onProgrammeFocused: (Programme, Channel) -> Unit,
+    onChannelFocused: (Channel) -> Unit,
     onProgrammeClick: (Programme, Channel) -> Unit,
     isLoading: Boolean,
     modifier: Modifier = Modifier
@@ -81,9 +91,13 @@ fun EpgGrid(
 
     // Map of FocusRequesters for each channel's "NOW" programme
     val nowFocusRequesters = remember { mutableMapOf<String, FocusRequester>() }
+    val offAirFocusRequesters = remember { mutableMapOf<String, FocusRequester>() }
     channels.forEach { ch ->
         if (!nowFocusRequesters.containsKey(ch.id)) {
             nowFocusRequesters[ch.id] = FocusRequester()
+        }
+        if ((scheduleMap[ch.id] ?: emptyList()).isEmpty() && !offAirFocusRequesters.containsKey(ch.id)) {
+            offAirFocusRequesters[ch.id] = FocusRequester()
         }
     }
 
@@ -98,7 +112,13 @@ fun EpgGrid(
                 // Ensure target row is visible in LazyColumn
                 verticalListState.animateScrollToItem(targetIndex)
                 try {
-                    nowFocusRequesters[targetChannel.id]?.requestFocus()
+                    val targetHasNoSchedule = (scheduleMap[targetChannel.id] ?: emptyList()).isEmpty()
+                    val requester = if (targetHasNoSchedule) {
+                        offAirFocusRequesters[targetChannel.id]
+                    } else {
+                        nowFocusRequesters[targetChannel.id]
+                    }
+                    requester?.requestFocus()
                 } catch (e: Exception) {
                     // Handled by pendingFocusChannelId LaunchedEffect when composed
                 }
@@ -111,12 +131,16 @@ fun EpgGrid(
         if (scheduleMap.isNotEmpty() && channels.isNotEmpty()) {
             val firstChannel = channels.first()
             pendingFocusChannelId = firstChannel.id
-            val requester = nowFocusRequesters[firstChannel.id]
+            verticalListState.scrollToItem(0)
+            val requester = if ((scheduleMap[firstChannel.id] ?: emptyList()).isEmpty()) {
+                offAirFocusRequesters[firstChannel.id]
+            } else {
+                nowFocusRequesters[firstChannel.id]
+            }
             for (attempt in 1..25) {
                 kotlinx.coroutines.delay(50L)
                 try {
                     requester?.requestFocus()
-                    break
                 } catch (_: Exception) {
                     // Keep retrying until first NOW cell is fully measured, laid out, and attached
                 }
@@ -283,18 +307,19 @@ fun EpgGrid(
                                     .height(ROW_HEIGHT_CHANNEL)
                             ) {
                                 if (programmes.isEmpty()) {
-                                    Box(
+                                    OffAirCell(
+                                        channel = channel,
+                                        focusRequester = offAirFocusRequesters.getOrPut(channel.id) { FocusRequester() },
+                                        pendingFocusChannelId = pendingFocusChannelId,
+                                        onClearPendingFocus = { pendingFocusChannelId = null },
+                                        channelIndex = index,
+                                        channelsCount = channels.size,
+                                        onNavigateVertical = onNavigateVerticalFromNow,
+                                        onFocused = onChannelFocused,
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .padding(horizontal = 16.dp),
-                                        contentAlignment = Alignment.CenterStart
-                                    ) {
-                                        Text(
-                                            text = if (isLoading) "Loading schedule..." else "No guide data available",
-                                            color = TextSecondary.copy(alpha = 0.5f),
-                                            fontSize = 12.sp
-                                        )
-                                    }
+                                            .padding(horizontal = 8.dp)
+                                    )
                                 } else {
                                     val timelineEndSeconds = timelineStartSeconds + (totalSlots * SLOT_DURATION_SECONDS)
                                     var previousEndSeconds = timelineStartSeconds
@@ -378,5 +403,74 @@ fun EpgGrid(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun OffAirCell(
+    channel: Channel,
+    focusRequester: FocusRequester,
+    pendingFocusChannelId: String?,
+    onClearPendingFocus: () -> Unit,
+    channelIndex: Int,
+    channelsCount: Int,
+    onNavigateVertical: (Int) -> Unit,
+    onFocused: (Channel) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
+    LaunchedEffect(isFocused) {
+        if (isFocused) onFocused(channel)
+    }
+
+    LaunchedEffect(pendingFocusChannelId) {
+        if (pendingFocusChannelId == channel.id) {
+            for (attempt in 1..8) {
+                try {
+                    focusRequester.requestFocus()
+                } catch (_: Exception) {
+                    // Retry while the row is being composed after vertical navigation.
+                }
+                kotlinx.coroutines.delay(35L)
+            }
+            onClearPendingFocus()
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .padding(vertical = 1.dp)
+            .then(if (isFocused) Modifier.border(2.dp, AccentCyan, RoundedCornerShape(6.dp)) else Modifier)
+            .background(
+                if (isFocused) Color(0xFF202D45) else Color(0xFF111724),
+                RoundedCornerShape(6.dp)
+            )
+            .focusRequester(focusRequester)
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown) {
+                    when {
+                        event.key == Key.DirectionDown && channelIndex < channelsCount - 1 -> {
+                            onNavigateVertical(channelIndex + 1)
+                            true
+                        }
+                        event.key == Key.DirectionUp && channelIndex > 0 -> {
+                            onNavigateVertical(channelIndex - 1)
+                            true
+                        }
+                        else -> false
+                    }
+                } else false
+            }
+            .clickable(interactionSource = interactionSource, indication = null) { },
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Text(
+            text = "Off air",
+            color = if (isFocused) TextPrimary else TextSecondary.copy(alpha = 0.75f),
+            fontSize = 12.sp,
+            modifier = Modifier.padding(horizontal = 10.dp)
+        )
     }
 }

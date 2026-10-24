@@ -172,6 +172,9 @@ fun MainEpgScreen(viewModel: EpgViewModel) {
             onProgrammeFocused = { prog, ch ->
                 viewModel.onProgrammeFocused(prog, ch)
             },
+            onChannelFocused = { channel ->
+                viewModel.onChannelFocused(channel)
+            },
             onProgrammeClick = { prog, ch ->
                 viewModel.onProgrammeClick(prog, ch)
             },
@@ -184,10 +187,14 @@ fun MainEpgScreen(viewModel: EpgViewModel) {
     if (state.showSettingsDialog) {
         SettingsDialog(
             enabledBroadcasters = state.enabledBroadcasters,
+            channelSortOrder = state.channelSortOrder,
             isMacroEnabled = state.isMacroEnabled,
             isAccessibilityServiceActive = state.isAccessibilityServiceActive,
             onToggleBroadcaster = { broadcaster ->
                 viewModel.toggleBroadcaster(broadcaster)
+            },
+            onChannelSortOrderSelected = { sortOrder ->
+                viewModel.setChannelSortOrder(sortOrder)
             },
             onToggleMacro = {
                 viewModel.toggleMacroAutoLaunch()

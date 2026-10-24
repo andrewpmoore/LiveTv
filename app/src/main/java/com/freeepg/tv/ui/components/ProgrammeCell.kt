@@ -101,10 +101,10 @@ fun ProgrammeCell(
             for (i in 1..8) {
                 try {
                     nowFocusRequester?.requestFocus()
-                    break
                 } catch (_: Exception) {
-                    kotlinx.coroutines.delay(35L)
+                    // Retry while the row is being composed after vertical navigation.
                 }
+                kotlinx.coroutines.delay(35L)
             }
             onClearPendingFocus()
         }

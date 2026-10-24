@@ -5,7 +5,6 @@
     <string name="filter_itv">ITVX</string>
     <string name="filter_c4">Channel 4</string>
     <string name="filter_c5">Channel 5</string>
-    <string name="filter_u">U (UKTV)</string>
 
     <string name="action_watch_live">Watch Live</string>
     <string name="action_refresh">Refresh Guide</string>
@@ -22,5 +21,5 @@
 
     <!-- Accessibility Service / Macro Automation -->
     <string name="accessibility_service_label">Live TV Stream Launcher</string>
-    <string name="accessibility_service_description">Automatically navigates broadcaster apps (BBC iPlayer, ITVX, Channel 4, My5, U) to launch live channels directly.</string>
+    <string name="accessibility_service_description">Automatically navigates broadcaster apps (BBC iPlayer, ITVX, Channel 4, My5) to launch live channels directly.</string>
 </resources>

@@ -10,6 +10,7 @@ import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.freeepg.tv.macro.MacroManager
+import com.freeepg.tv.data.model.Broadcaster
 
 /**
  * High-performance Accessibility Service that inspects broadcaster app UI
@@ -64,9 +65,34 @@ class EpgMacroAccessibilityService : AccessibilityService() {
                 return
             }
 
+            // BBC iPlayer pauses at its profile chooser before channel navigation. Select the
+            // first existing profile once, then let the pending channel steps continue.
+            if (pending.channel.broadcaster == Broadcaster.BBC &&
+                handleBbcProfileChooser(rootNode, pending)
+            ) {
+                lastActionTimeMs = System.currentTimeMillis()
+                return
+            }
+
             // 2. Execute current macro step
             val currentStep = pending.currentStep ?: return
             Log.d(TAG, "Executing macro step for ${pending.channel.name}: ${currentStep.description}")
+
+            if (pending.channel.broadcaster == Broadcaster.CHANNEL_5 &&
+                pending.targetPackage == "com.channel5.my5"
+            ) {
+                when (navigateChannel5(rootNode, pending)) {
+                    Channel5StepResult.ACTION_ADVANCED -> {
+                        lastActionTimeMs = System.currentTimeMillis()
+                        return
+                    }
+                    Channel5StepResult.ACTION_WAITING -> {
+                        lastActionTimeMs = System.currentTimeMillis()
+                        return
+                    }
+                    Channel5StepResult.NOT_HANDLED -> Unit
+                }
+            }
 
             var actionExecuted = false
             for (term in currentStep.searchTerms) {
@@ -97,21 +123,181 @@ class EpgMacroAccessibilityService : AccessibilityService() {
         }
     }
 
+    private enum class Channel5StepResult { ACTION_ADVANCED, ACTION_WAITING, NOT_HANDLED }
+
+    /** Returns true while the BBC profile chooser is visible so channel matching waits. */
+    private fun handleBbcProfileChooser(
+        root: AccessibilityNodeInfo,
+        pending: com.freeepg.tv.macro.PendingMacro
+    ): Boolean {
+        val packageId = pending.targetPackage
+        val containers = root.findAccessibilityNodeInfosByViewId(
+            "$packageId:id/user-switcher_container"
+        ) ?: emptyList()
+        if (containers.isEmpty()) return false
+
+        val profileList = containers.first()
+        containers.drop(1).forEach { it.recycle() }
+
+        if (!pending.firstBbcProfileSelectionRequested) {
+            val firstProfileCard = profileList.getChild(0)
+            val profileButton = firstProfileCard?.let(::findFirstClickableDescendant)
+            firstProfileCard?.recycle()
+
+            if (profileButton != null) {
+                val clicked = performClickOnNode(profileButton)
+                profileButton.recycle()
+                if (clicked) {
+                    pending.firstBbcProfileSelectionRequested = true
+                    Log.i(TAG, "Selected the first BBC iPlayer profile")
+                }
+            }
+        }
+
+        profileList.recycle()
+        return true
+    }
+
+    private fun findFirstClickableDescendant(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val viewId = node.viewIdResourceName.orEmpty()
+        if (node.isVisibleToUser && node.isClickable &&
+            !viewId.contains("avatar-add-") && !viewId.startsWith("edit-")
+        ) {
+            return AccessibilityNodeInfo.obtain(node)
+        }
+
+        for (index in 0 until node.childCount) {
+            val child = node.getChild(index) ?: continue
+            val target = findFirstClickableDescendant(child)
+            child.recycle()
+            if (target != null) return target
+        }
+        return null
+    }
+
+    /**
+     * The current 5 TV app omits labels from its Live TV channel tiles. Use its visible
+     * channel list order and view IDs instead of guessing from unrelated programme text.
+     */
+    private fun navigateChannel5(
+        root: AccessibilityNodeInfo,
+        pending: com.freeepg.tv.macro.PendingMacro
+    ): Channel5StepResult {
+        val packageId = pending.targetPackage
+
+        if (pending.currentStepIndex == 0) {
+            val menuItems = root.findAccessibilityNodeInfosByViewId(
+                "$packageId:id/left_navigation_menu_item"
+            ) ?: emptyList()
+            val playerContainers = root.findAccessibilityNodeInfosByViewId(
+                "$packageId:id/c5PlayerParent"
+            ) ?: emptyList()
+            val livePlayer = playerContainers.isNotEmpty()
+            playerContainers.forEach { it.recycle() }
+
+            if (menuItems.isNotEmpty()) {
+                val liveTvMenuItem = menuItems.getOrNull(3)
+                menuItems.forEach { if (it !== liveTvMenuItem) it.recycle() }
+                if (liveTvMenuItem != null) {
+                    val clicked = performClickOnNode(liveTvMenuItem)
+                    liveTvMenuItem.recycle()
+                    if (clicked) {
+                        MacroManager.advanceStep()
+                        Log.i(TAG, "Opened 5 Live TV menu")
+                        return Channel5StepResult.ACTION_ADVANCED
+                    }
+                }
+            }
+
+            if (livePlayer) {
+                MacroManager.advanceStep()
+                return Channel5StepResult.ACTION_ADVANCED
+            }
+            return Channel5StepResult.NOT_HANDLED
+        }
+
+        if (pending.currentStepIndex == 1) {
+            val channelLists = root.findAccessibilityNodeInfosByViewId(
+                "$packageId:id/live_channels_list"
+            ) ?: emptyList()
+            val channelIndex = when (pending.channel.id) {
+                "c5" -> 0
+                "c5_usa" -> 1
+                "c5_star" -> 2
+                "c5_action" -> 3
+                "c5_drama" -> 4
+                else -> -1
+            }
+
+            if (channelLists.isNotEmpty() && channelIndex >= 0) {
+                val channelList = channelLists.first()
+                channelLists.drop(1).forEach { it.recycle() }
+                val channelTile = channelList.getChild(channelIndex)
+                channelList.recycle()
+                if (channelTile != null) {
+                    val clicked = performClickOnNode(channelTile)
+                    channelTile.recycle()
+                    if (clicked) {
+                        MacroManager.advanceStep()
+                        Log.i(TAG, "Selected 5 live channel index $channelIndex for ${pending.channel.id}")
+                        return Channel5StepResult.ACTION_ADVANCED
+                    }
+                }
+                return Channel5StepResult.ACTION_WAITING
+            }
+            channelLists.forEach { it.recycle() }
+
+            // A tap on the live player reveals the labelled stream cards. Wait for its UI event
+            // and then select the channel tile on the next accessibility callback.
+            val playerViews = root.findAccessibilityNodeInfosByViewId("$packageId:id/video_view")
+                ?: emptyList()
+            val playerView = playerViews.firstOrNull { view ->
+                val bounds = Rect()
+                view.getBoundsInScreen(bounds)
+                bounds.width() > 500 && bounds.height() > 500
+            }
+            playerViews.forEach { if (it !== playerView) it.recycle() }
+            if (playerView != null) {
+                val tapped = performTapGesture(playerView)
+                playerView.recycle()
+                if (tapped) return Channel5StepResult.ACTION_WAITING
+            }
+        }
+
+        return Channel5StepResult.NOT_HANDLED
+    }
+
     /**
      * Recursively searches for a node whose text or contentDescription contains [term] (case-insensitive).
      */
     private fun findMatchingNode(node: AccessibilityNodeInfo, term: String): AccessibilityNodeInfo? {
+        return findMatchingNode(node, term, exact = true)
+            ?: findMatchingNode(node, term, exact = false)
+    }
+
+    private fun findMatchingNode(
+        node: AccessibilityNodeInfo,
+        term: String,
+        exact: Boolean
+    ): AccessibilityNodeInfo? {
+        if (!node.isVisibleToUser) return null
+
         val text = node.text?.toString() ?: ""
         val contentDesc = node.contentDescription?.toString() ?: ""
+        val matches = if (exact) {
+            text.equals(term, ignoreCase = true) || contentDesc.equals(term, ignoreCase = true)
+        } else {
+            text.contains(term, ignoreCase = true) || contentDesc.contains(term, ignoreCase = true)
+        }
 
-        if (text.contains(term, ignoreCase = true) || contentDesc.contains(term, ignoreCase = true)) {
+        if (matches) {
             return AccessibilityNodeInfo.obtain(node)
         }
 
         val childCount = node.childCount
         for (i in 0 until childCount) {
             val child = node.getChild(i) ?: continue
-            val result = findMatchingNode(child, term)
+            val result = findMatchingNode(child, term, exact)
             child.recycle()
             if (result != null) return result
         }

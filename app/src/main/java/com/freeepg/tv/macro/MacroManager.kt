@@ -29,9 +29,10 @@ data class PendingMacro(
     val targetPackage: String,
     val steps: List<MacroStep>,
     val timestampMs: Long = System.currentTimeMillis(),
-    val ttlMs: Long = 20_000L
+    val ttlMs: Long = 45_000L
 ) {
     var currentStepIndex: Int = 0
+    var firstBbcProfileSelectionRequested: Boolean = false
 
     val isExpired: Boolean
         get() = (System.currentTimeMillis() - timestampMs) > ttlMs
@@ -133,80 +134,70 @@ object MacroManager {
         val steps = mutableListOf<MacroStep>()
 
         val channelSearchTerms = listOf(
-            channel.name,
             channel.shortName,
+            channel.shortName.replace(" ", ""),
             channel.name.replace(" HD", ""),
-            channel.shortName.replace("U&", "")
+            channel.name
         ).distinct()
 
         when (channel.broadcaster) {
             Broadcaster.BBC -> {
-                // BBC iPlayer:
-                // Step 1: In case on Home screen, look for "Channels", "Live TV", or direct channel name / "Watch Live"
+                // Go to the channel list before searching: channel names also appear in home rails.
                 steps.add(
                     MacroStep(
-                        searchTerms = listOf("Watch Live", "Watch live now", "Play live") + channelSearchTerms + listOf("Channels", "Live"),
-                        description = "Find Live TV or '${channel.shortName}'"
+                        searchTerms = listOf("Channels"),
+                        description = "Open BBC iPlayer channels"
                     )
                 )
-                // Step 2: In Channels view, click the specific channel tile
                 steps.add(
                     MacroStep(
-                        searchTerms = channelSearchTerms + listOf("Watch Live", "Watch from start", "Play"),
+                        searchTerms = channelSearchTerms,
                         description = "Select '${channel.shortName}' tile"
                     )
                 )
-                // Step 3: If a playback prompt appears ("Watch Live" / "Watch from start"), select "Watch Live"
                 steps.add(
                     MacroStep(
-                        searchTerms = listOf("Watch Live", "Watch live now", "Play live", "Watch"),
+                        searchTerms = listOf("Watch Live", "Watch live now", "Play live"),
                         description = "Confirm 'Watch Live'"
                     )
                 )
             }
 
             Broadcaster.ITV -> {
-                // ITVX:
-                // Step 1: Look for "Live", "Channels", "Live TV" or direct channel name
                 steps.add(
                     MacroStep(
-                        searchTerms = listOf("Watch Live", "Live", "Live TV", "Channels") + channelSearchTerms,
-                        description = "Navigate to Live or '${channel.shortName}'"
+                        searchTerms = listOf("Live TV", "Channels"),
+                        description = "Open ITVX Live TV"
                     )
                 )
-                // Step 2: Channel tile selection
                 steps.add(
                     MacroStep(
-                        searchTerms = channelSearchTerms + listOf("Watch Live", "Play"),
+                        searchTerms = channelSearchTerms,
                         description = "Select '${channel.shortName}'"
                     )
                 )
-                // Step 3: Confirm Live stream playback
                 steps.add(
                     MacroStep(
-                        searchTerms = listOf("Watch Live", "Watch live now", "Play", "Watch"),
+                        searchTerms = listOf("Watch Live", "Watch live now", "Play live"),
                         description = "Confirm 'Watch Live'"
                     )
                 )
             }
 
             Broadcaster.CHANNEL_4 -> {
-                // Channel 4:
-                // Step 1: Look for "Live TV", "Live", "Channels", or channel name
+                // Channel 4 normally launches directly. Keep these steps for app versions that do not.
                 steps.add(
                     MacroStep(
-                        searchTerms = listOf("Watch Live", "Live TV", "Live", "Channels") + channelSearchTerms,
+                        searchTerms = listOf("Live TV", "Channels"),
                         description = "Navigate to Live or '${channel.shortName}'"
                     )
                 )
-                // Step 2: Select Channel 4 / E4 / More4 / Film4 / 4seven
                 steps.add(
                     MacroStep(
-                        searchTerms = channelSearchTerms + listOf("Watch Live", "Play"),
+                        searchTerms = channelSearchTerms,
                         description = "Select '${channel.shortName}'"
                     )
                 )
-                // Step 3: Confirm playback
                 steps.add(
                     MacroStep(
                         searchTerms = listOf("Watch Live", "Play", "Watch"),
@@ -216,45 +207,16 @@ object MacroManager {
             }
 
             Broadcaster.CHANNEL_5 -> {
-                // Channel 5 / My5:
                 steps.add(
                     MacroStep(
-                        searchTerms = listOf("Watch Live", "Channels", "Live", "My5") + channelSearchTerms,
-                        description = "Navigate to Channels or '${channel.shortName}'"
+                        searchTerms = emptyList(),
+                        description = "Open 5 live channels"
                     )
                 )
                 steps.add(
                     MacroStep(
-                        searchTerms = channelSearchTerms + listOf("Watch Live", "Play"),
-                        description = "Select '${channel.shortName}'"
-                    )
-                )
-                steps.add(
-                    MacroStep(
-                        searchTerms = listOf("Watch Live", "Play", "Watch"),
-                        description = "Confirm Live Playback"
-                    )
-                )
-            }
-
-            Broadcaster.U -> {
-                // U (UKTV Play):
-                steps.add(
-                    MacroStep(
-                        searchTerms = listOf("Watch Live", "Live", "Channels") + channelSearchTerms,
-                        description = "Navigate to Live or '${channel.shortName}'"
-                    )
-                )
-                steps.add(
-                    MacroStep(
-                        searchTerms = channelSearchTerms + listOf("Watch Live", "Play"),
-                        description = "Select '${channel.shortName}'"
-                    )
-                )
-                steps.add(
-                    MacroStep(
-                        searchTerms = listOf("Watch Live", "Play", "Watch"),
-                        description = "Confirm Live Playback"
+                        searchTerms = emptyList(),
+                        description = "Tune to '${channel.shortName}'"
                     )
                 )
             }

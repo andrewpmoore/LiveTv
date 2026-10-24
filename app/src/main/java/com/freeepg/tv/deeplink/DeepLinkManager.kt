@@ -33,19 +33,23 @@ class DeepLinkManager(private val context: Context) {
      */
     fun findInstalledPackage(broadcaster: Broadcaster): String? {
         val pm = context.packageManager
+        val installedPackages = mutableListOf<String>()
         for (pkg in broadcaster.allPackages) {
             try {
                 pm.getPackageInfo(pkg, 0)
-                return pkg
+                installedPackages.add(pkg)
             } catch (_: PackageManager.NameNotFoundException) {
                 // Not installed, continue checking fallbacks
             }
         }
-        return null
+
+        return installedPackages.firstOrNull { pm.getLeanbackLaunchIntentForPackage(it) != null }
+            ?: installedPackages.firstOrNull()
     }
 
     /**
-     * Launches directly into the broadcaster app's live stream for this channel and programme.
+     * Uses a verified channel link when available; otherwise opens the TV app and lets the
+     * accessibility macro navigate its live-channel menus.
      */
     fun launchLiveProgramme(channel: Channel, programme: Programme): LaunchResult {
         val installedPackage = findInstalledPackage(channel.broadcaster)
@@ -61,36 +65,97 @@ class DeepLinkManager(private val context: Context) {
             )
         }
 
-        // Arm the accessibility macro only if auto-navigation is enabled and accessibility service is active
-        if (com.freeepg.tv.macro.MacroManager.isAccessibilityServiceEnabled(context) &&
-            com.freeepg.tv.data.repository.SettingsRepository(context).isMacroAutoLaunchEnabled()
-        ) {
-            com.freeepg.tv.macro.MacroManager.armMacro(channel, installedPackage)
-        } else {
-            com.freeepg.tv.macro.MacroManager.clearPendingMacro()
+        val canNavigateMenus =
+            com.freeepg.tv.macro.MacroManager.isAccessibilityServiceEnabled(context) &&
+                com.freeepg.tv.data.repository.SettingsRepository(context).isMacroAutoLaunchEnabled()
+
+        // Clear any previous navigation before trying a direct link. Otherwise an old macro can
+        // take over the broadcaster app after the requested channel has already opened.
+        com.freeepg.tv.macro.MacroManager.clearPendingMacro()
+
+        // Channels without a verified direct route need menu navigation to reach the live stream.
+        if (channel.deepLinkUris.isEmpty() && !canNavigateMenus) {
+            return LaunchResult.Failure(
+                "${channel.broadcaster.displayName} needs automatic navigation enabled to select a live channel"
+            )
         }
 
         // 1. Try specific deep link URIs targeted to the installed package
         for (uriString in channel.deepLinkUris) {
             try {
                 val uri = Uri.parse(uriString)
-                val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                val isWebUri = uriString.startsWith("http://") || uriString.startsWith("https://")
+
+                // Strategy A: If it's a web URI, test with CATEGORY_BROWSABLE and installed package
+                if (isWebUri) {
+                    val browsableIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+                        setPackage(installedPackage)
+                        addCategory(Intent.CATEGORY_BROWSABLE)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                        putExtra("channel_id", channel.id)
+                        putExtra("channel_name", channel.name)
+                        putExtra("channel", channel.shortName)
+                        putExtra("live", true)
+                    }
+                    if (browsableIntent.resolveActivity(context.packageManager) != null) {
+                        context.startActivity(browsableIntent)
+                        Log.d(TAG, "Successfully launched web deep link $uriString via $installedPackage")
+                        return LaunchResult.Success(
+                            destination = "${channel.name} (${channel.broadcaster.displayName})",
+                            method = "Web DeepLink: $uriString"
+                        )
+                    }
+                }
+
+                // Strategy B: Custom scheme or web fallback with default categories (e.g. bbc://, bbciplayer://, itvx://, my5://)
+                val directIntent = Intent(Intent.ACTION_VIEW, uri).apply {
                     setPackage(installedPackage)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                    addCategory(Intent.CATEGORY_BROWSABLE)
+                    putExtra("channel_id", channel.id)
+                    putExtra("channel_name", channel.name)
+                    putExtra("channel", channel.shortName)
+                    putExtra("live", true)
                 }
-                if (intent.resolveActivity(context.packageManager) != null) {
-                    context.startActivity(intent)
-                    Log.d(TAG, "Successfully launched deep link $uriString via $installedPackage")
+                if (directIntent.resolveActivity(context.packageManager) != null) {
+                    context.startActivity(directIntent)
+                    Log.d(TAG, "Successfully launched direct deep link $uriString via $installedPackage")
                     return LaunchResult.Success(
                         destination = "${channel.name} (${channel.broadcaster.displayName})",
-                        method = "DeepLink: $uriString"
+                        method = "Direct DeepLink: $uriString"
+                    )
+                }
+
+                // Strategy C: Intent without explicit setPackage, verified against broadcaster packages
+                val generalIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    putExtra("channel_id", channel.id)
+                    putExtra("channel_name", channel.name)
+                    putExtra("channel", channel.shortName)
+                    putExtra("live", true)
+                }
+                val resolveInfo = context.packageManager.resolveActivity(generalIntent, 0)
+                if (resolveInfo != null && channel.broadcaster.allPackages.contains(resolveInfo.activityInfo?.packageName)) {
+                    generalIntent.setPackage(resolveInfo.activityInfo.packageName)
+                    context.startActivity(generalIntent)
+                    Log.d(TAG, "Successfully launched resolved deep link $uriString via ${resolveInfo.activityInfo.packageName}")
+                    return LaunchResult.Success(
+                        destination = "${channel.name} (${channel.broadcaster.displayName})",
+                        method = "Resolved DeepLink: $uriString"
                     )
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Attempt with URI $uriString failed: ${e.message}")
             }
         }
+
+        if (!canNavigateMenus) {
+            return LaunchResult.Failure(
+                "${channel.broadcaster.displayName} could not open ${channel.shortName} directly. Enable automatic navigation to continue."
+            )
+        }
+
+        // The direct route was unavailable, so use the configured on-screen navigation steps.
+        com.freeepg.tv.macro.MacroManager.armMacro(channel, installedPackage)
 
         // 2. Direct fallback launch of the installed broadcaster TV app
         try {
@@ -99,18 +164,18 @@ class DeepLinkManager(private val context: Context) {
                 ?: pm.getLaunchIntentForPackage(installedPackage)
 
             if (launchIntent == null) {
-                if (installedPackage == "bbc.iplayer.android") {
+                if (installedPackage == "bbc.iplayer.android" || installedPackage == "uk.co.bbc.iplayer") {
                     launchIntent = Intent(Intent.ACTION_MAIN).apply {
                         component = android.content.ComponentName(
-                            "bbc.iplayer.android",
+                            installedPackage,
                             "external.androidtv.psbwrapper.deeplinking.DeepLinkActivity"
                         )
                         addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
                     }
-                } else if (installedPackage == "air.ITVMobilePlayer") {
+                } else if (installedPackage == "air.ITVMobilePlayer" || installedPackage == "com.itv.tenft.itvhub") {
                     launchIntent = Intent(Intent.ACTION_MAIN).apply {
                         component = android.content.ComponentName(
-                            "air.ITVMobilePlayer",
+                            installedPackage,
                             "com.itv.tenft.itvhub.ItvActivity"
                         )
                         addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
@@ -133,11 +198,19 @@ class DeepLinkManager(private val context: Context) {
 
             if (launchIntent != null) {
                 launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                launchIntent.putExtra("channel_id", channel.id)
+                launchIntent.putExtra("channel_name", channel.name)
+                launchIntent.putExtra("channel", channel.shortName)
+                launchIntent.putExtra("live", true)
                 context.startActivity(launchIntent)
                 Log.d(TAG, "Launched installed app $installedPackage")
                 return LaunchResult.Success(
                     destination = channel.broadcaster.displayName,
-                    method = "App Launcher: $installedPackage"
+                    method = if (channel.deepLinkUris.isEmpty()) {
+                        "App Launcher + Accessibility Navigation: $installedPackage"
+                    } else {
+                        "App Launcher: $installedPackage"
+                    }
                 )
             }
         } catch (e: Exception) {

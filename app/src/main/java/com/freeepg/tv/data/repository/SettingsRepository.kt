@@ -5,6 +5,12 @@ import android.content.SharedPreferences
 import com.freeepg.tv.data.model.Broadcaster
 import com.freeepg.tv.data.model.Channel
 
+enum class ChannelSortOrder(val label: String) {
+    PROVIDER("By provider"),
+    NAME("Alphabetically"),
+    NUMBER("By channel number")
+}
+
 class SettingsRepository(context: Context) {
 
     private val prefs: SharedPreferences =
@@ -14,6 +20,7 @@ class SettingsRepository(context: Context) {
         private const val PREFS_NAME = "freeepg_settings"
         private const val KEY_ENABLED_BROADCASTERS = "enabled_broadcasters"
         private const val KEY_MACRO_AUTO_LAUNCH = "macro_auto_launch_enabled"
+        private const val KEY_CHANNEL_SORT_ORDER = "channel_sort_order"
 
         // All broadcasters enabled by default
         val DEFAULT_BROADCASTERS: Set<Broadcaster> = Broadcaster.values().toSet()
@@ -64,13 +71,34 @@ class SettingsRepository(context: Context) {
         prefs.edit().putStringSet(KEY_ENABLED_BROADCASTERS, names).apply()
     }
 
-    fun getFilteredChannels(selectedBroadcaster: Broadcaster?): List<Channel> {
+    fun getChannelSortOrder(): ChannelSortOrder {
+        val storedValue = prefs.getString(KEY_CHANNEL_SORT_ORDER, ChannelSortOrder.PROVIDER.name)
+        return ChannelSortOrder.values().firstOrNull { it.name == storedValue }
+            ?: ChannelSortOrder.PROVIDER
+    }
+
+    fun setChannelSortOrder(sortOrder: ChannelSortOrder) {
+        prefs.edit().putString(KEY_CHANNEL_SORT_ORDER, sortOrder.name).apply()
+    }
+
+    fun getFilteredChannels(
+        selectedBroadcaster: Broadcaster?,
+        sortOrder: ChannelSortOrder = getChannelSortOrder()
+    ): List<Channel> {
         val enabledBroadcasters = getEnabledBroadcasters()
         val allEnabledChannels = Channel.ALL_CHANNELS.filter { it.broadcaster in enabledBroadcasters }
-        return if (selectedBroadcaster != null && selectedBroadcaster in enabledBroadcasters) {
+        val filtered = if (selectedBroadcaster != null && selectedBroadcaster in enabledBroadcasters) {
             allEnabledChannels.filter { it.broadcaster == selectedBroadcaster }
         } else {
             allEnabledChannels
+        }
+        return when (sortOrder) {
+            ChannelSortOrder.PROVIDER -> filtered
+            ChannelSortOrder.NAME -> filtered.sortedBy { it.name.lowercase() }
+            ChannelSortOrder.NUMBER -> filtered.sortedWith(
+                compareBy<Channel> { it.channelNumber.toIntOrNull() ?: Int.MAX_VALUE }
+                    .thenBy { it.name.lowercase() }
+            )
         }
     }
 
