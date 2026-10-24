@@ -78,7 +78,8 @@ fun SettingsDialog(
         for (attempt in 1..10) {
             kotlinx.coroutines.delay(60)
             try {
-                if (selectedSortOptionFocusRequester.requestFocus()) break
+                selectedSortOptionFocusRequester.requestFocus()
+                break
             } catch (_: Exception) {
                 // Retry while the dialog's first option is being composed.
             }
@@ -90,7 +91,8 @@ fun SettingsDialog(
             for (attempt in 1..10) {
                 kotlinx.coroutines.delay(100)
                 try {
-                    if (accessibilitySettingsFocusRequester.requestFocus()) break
+                    accessibilitySettingsFocusRequester.requestFocus()
+                    break
                 } catch (_: Exception) {
                     // Retry while the dialog window and accessibility row regain focusability.
                 }
