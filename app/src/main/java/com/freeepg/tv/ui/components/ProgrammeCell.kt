@@ -51,6 +51,9 @@ import com.freeepg.tv.ui.theme.AccentLive
 import com.freeepg.tv.ui.theme.TextPrimary
 import com.freeepg.tv.ui.theme.TextSecondary
 import com.freeepg.tv.ui.theme.TextTertiary
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 private val CellShape = RoundedCornerShape(6.dp)
 private val FocusedCardBrush = Brush.verticalGradient(
@@ -80,6 +83,7 @@ fun ProgrammeCell(
     cellWidth: Dp,
     visibleStartSeconds: Long,
     visibleEndSeconds: Long,
+    isWithinRenderWindow: Boolean,
     height: Dp = ROW_HEIGHT_CHANNEL,
     onFocused: (Programme, Channel) -> Unit,
     onClick: (Programme, Channel) -> Unit,
@@ -87,6 +91,14 @@ fun ProgrammeCell(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
+    val programmeLabels = remember(programme) {
+        val formatter = SimpleDateFormat("HH:mm", Locale.UK)
+        Triple(
+            formatter.format(Date(programme.startTimeEpochSeconds * 1000)),
+            formatter.format(Date(programme.endTimeEpochSeconds * 1000)),
+            programme.formattedEpisodeInfo()
+        )
+    }
 
     // Notify parent hero pane whenever this cell gains focus
     LaunchedEffect(isFocused) {
@@ -165,12 +177,13 @@ fun ProgrammeCell(
             .background(backgroundBrush)
             .then(borderModifier)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = if (cellWidth < 60.dp) 5.dp else 8.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
+        if (isWithinRenderWindow || isFocused) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = if (cellWidth < 60.dp) 5.dp else 8.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
             // Top row: Title and Badges
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -219,8 +232,8 @@ fun ProgrammeCell(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 val timeLabel = when {
-                    cellWidth >= 70.dp -> "${programme.formattedStartTime()} - ${programme.formattedEndTime()}"
-                    cellWidth >= 38.dp -> programme.formattedStartTime()
+                    cellWidth >= 70.dp -> "${programmeLabels.first} - ${programmeLabels.second}"
+                    cellWidth >= 38.dp -> programmeLabels.first
                     else -> ""
                 }
 
@@ -234,7 +247,7 @@ fun ProgrammeCell(
                 }
 
                 if (cellWidth >= 120.dp) {
-                    programme.formattedEpisodeInfo()?.let { ep ->
+                    programmeLabels.third?.let { ep ->
                         Text(
                             text = ep,
                             color = TextTertiary,
@@ -245,25 +258,26 @@ fun ProgrammeCell(
                     }
                 }
             }
-        }
+            }
 
-        // Bottom row: Edge-to-edge live progress bar mathematically aligned with NOW needle
-        if (isLive) {
-            Box(
-                modifier = Modifier
+            // Bottom row: Edge-to-edge live progress bar mathematically aligned with NOW needle
+            if (isLive) {
+                Box(
+                    modifier = Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
                     .height(3.dp)
                     .background(Color(0x33000000))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(fraction = visibleProgress)
-                        .background(
-                            Brush.horizontalGradient(channel.broadcaster.brandGradient)
-                        )
-                )
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(fraction = visibleProgress)
+                            .background(
+                                Brush.horizontalGradient(channel.broadcaster.brandGradient)
+                            )
+                    )
+                }
             }
         }
     }

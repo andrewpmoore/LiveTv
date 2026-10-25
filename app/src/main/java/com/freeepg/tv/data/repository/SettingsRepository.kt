@@ -21,10 +21,57 @@ class SettingsRepository(context: Context) {
         private const val KEY_ENABLED_BROADCASTERS = "enabled_broadcasters"
         private const val KEY_MACRO_AUTO_LAUNCH = "macro_auto_launch_enabled"
         private const val KEY_CHANNEL_SORT_ORDER = "channel_sort_order"
+        private const val KEY_TUNER_CONFIGURED = "tuner_configured_v1"
 
         // All broadcasters enabled by default
         val DEFAULT_BROADCASTERS: Set<Broadcaster> = Broadcaster.values().toSet()
         const val DEFAULT_MACRO_AUTO_LAUNCH: Boolean = true
+
+        fun filterChannels(
+            allAppChannels: List<Channel>,
+            selectedBroadcaster: Broadcaster?,
+            enabledBroadcasters: Set<Broadcaster>,
+            sortOrder: ChannelSortOrder,
+            tunerChannels: List<Channel> = emptyList()
+        ): List<Channel> {
+            val allEnabledAppChannels = allAppChannels.filter { it.broadcaster in enabledBroadcasters }
+
+            val filtered = when {
+                // "TV Tuner" filter selected in top filter bar
+                selectedBroadcaster == Broadcaster.TUNER -> {
+                    tunerChannels
+                }
+                // Specific broadcaster filter (BBC, ITV, Channel 4, Channel 5)
+                selectedBroadcaster != null -> {
+                    if (selectedBroadcaster in enabledBroadcasters) {
+                        allEnabledAppChannels.filter { it.broadcaster == selectedBroadcaster }
+                    } else {
+                        allEnabledAppChannels
+                    }
+                }
+                // "All Channels" view
+                else -> {
+                    // If TV Tuner is enabled, include tuner-exclusive channels.
+                    // Where there is an overlap, the app version is already in allEnabledAppChannels,
+                    // so overlapping tuner channels are omitted to avoid duplicates and prioritize app streams.
+                    if (Broadcaster.TUNER in enabledBroadcasters) {
+                        val tunerExclusive = tunerChannels.filter { !it.isOverlappingWithApp }
+                        allEnabledAppChannels + tunerExclusive
+                    } else {
+                        allEnabledAppChannels
+                    }
+                }
+            }
+
+            return when (sortOrder) {
+                ChannelSortOrder.PROVIDER -> filtered
+                ChannelSortOrder.NAME -> filtered.sortedBy { it.name.lowercase() }
+                ChannelSortOrder.NUMBER -> filtered.sortedWith(
+                    compareBy<Channel> { it.channelNumber.toIntOrNull() ?: Int.MAX_VALUE }
+                        .thenBy { it.name.lowercase() }
+                )
+            }
+        }
     }
 
     fun getEnabledBroadcasters(): Set<Broadcaster> {
@@ -37,7 +84,14 @@ class SettingsRepository(context: Context) {
             } catch (e: IllegalArgumentException) {
                 null
             }
-        }.toSet()
+        }.toMutableSet()
+
+        // Migration: Enable TUNER by default on upgrades from earlier app versions
+        if (!prefs.contains(KEY_TUNER_CONFIGURED)) {
+            set.add(Broadcaster.TUNER)
+            saveEnabledBroadcasters(set)
+            prefs.edit().putBoolean(KEY_TUNER_CONFIGURED, true).apply()
+        }
 
         // Ensure at least one broadcaster remains enabled so the guide is never blank
         return if (set.isEmpty()) DEFAULT_BROADCASTERS else set
@@ -83,23 +137,16 @@ class SettingsRepository(context: Context) {
 
     fun getFilteredChannels(
         selectedBroadcaster: Broadcaster?,
-        sortOrder: ChannelSortOrder = getChannelSortOrder()
+        sortOrder: ChannelSortOrder = getChannelSortOrder(),
+        tunerChannels: List<Channel> = emptyList()
     ): List<Channel> {
-        val enabledBroadcasters = getEnabledBroadcasters()
-        val allEnabledChannels = Channel.ALL_CHANNELS.filter { it.broadcaster in enabledBroadcasters }
-        val filtered = if (selectedBroadcaster != null && selectedBroadcaster in enabledBroadcasters) {
-            allEnabledChannels.filter { it.broadcaster == selectedBroadcaster }
-        } else {
-            allEnabledChannels
-        }
-        return when (sortOrder) {
-            ChannelSortOrder.PROVIDER -> filtered
-            ChannelSortOrder.NAME -> filtered.sortedBy { it.name.lowercase() }
-            ChannelSortOrder.NUMBER -> filtered.sortedWith(
-                compareBy<Channel> { it.channelNumber.toIntOrNull() ?: Int.MAX_VALUE }
-                    .thenBy { it.name.lowercase() }
-            )
-        }
+        return filterChannels(
+            allAppChannels = Channel.ALL_CHANNELS,
+            selectedBroadcaster = selectedBroadcaster,
+            enabledBroadcasters = getEnabledBroadcasters(),
+            sortOrder = sortOrder,
+            tunerChannels = tunerChannels
+        )
     }
 
     fun isMacroAutoLaunchEnabled(): Boolean {

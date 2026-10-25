@@ -191,6 +191,10 @@ fun MainEpgScreen(viewModel: EpgViewModel) {
             focusRequestId = state.settingsFocusRequestId,
             isMacroEnabled = state.isMacroEnabled,
             isAccessibilityServiceActive = state.isAccessibilityServiceActive,
+            tunerChannelsCount = state.tunerChannels.size,
+            tunerName = state.tunerName,
+            tunerIp = state.tunerIp,
+            isScanningTuner = state.isScanningTuner,
             onToggleBroadcaster = { broadcaster ->
                 viewModel.toggleBroadcaster(broadcaster)
             },
@@ -202,6 +206,9 @@ fun MainEpgScreen(viewModel: EpgViewModel) {
             },
             onOpenAccessibilitySettings = {
                 viewModel.openAccessibilitySettings()
+            },
+            onScanTuner = {
+                viewModel.scanForTuner(silent = false)
             },
             onDismiss = {
                 viewModel.closeSettings()

@@ -11,6 +11,7 @@ import com.freeepg.tv.data.repository.ChannelSortOrder
 import com.freeepg.tv.data.repository.SettingsRepository
 import com.freeepg.tv.deeplink.DeepLinkManager
 import com.freeepg.tv.deeplink.LaunchResult
+import com.freeepg.tv.tuner.HdHomeRunManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,7 +38,11 @@ data class EpgUiState(
     val settingsFocusRequestId: Int = 0,
     val isMacroEnabled: Boolean = true,
     val isAccessibilityServiceActive: Boolean = false,
-    val notInstalledDialog: LaunchResult.AppNotInstalled? = null
+    val notInstalledDialog: LaunchResult.AppNotInstalled? = null,
+    val tunerChannels: List<Channel> = emptyList(),
+    val tunerName: String? = null,
+    val tunerIp: String? = null,
+    val isScanningTuner: Boolean = false
 ) {
     companion object {
         fun computeTimelineStart(nowSeconds: Long): Long {
@@ -53,6 +58,9 @@ class EpgViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = EpgRepository(application)
     val settingsRepository = SettingsRepository(application)
     val deepLinkManager = DeepLinkManager(application)
+    val hdHomeRunManager = HdHomeRunManager(application)
+
+    private var tunerChannels: List<Channel> = emptyList()
 
     private val _uiState = MutableStateFlow(
         EpgUiState(
@@ -67,7 +75,7 @@ class EpgViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         startClockTicker()
-        loadEpgData()
+        loadTunerChannelsAndSchedule()
     }
 
     private fun startClockTicker() {
@@ -81,14 +89,77 @@ class EpgViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun loadTunerChannelsAndSchedule() {
+        viewModelScope.launch {
+            tunerChannels = hdHomeRunManager.getTunerChannels(forceRefresh = false)
+            val current = _uiState.value
+            val activeChannels = settingsRepository.getFilteredChannels(
+                current.selectedBroadcaster,
+                current.channelSortOrder,
+                tunerChannels
+            )
+            _uiState.update {
+                it.copy(
+                    channels = activeChannels,
+                    tunerChannels = tunerChannels,
+                    tunerName = hdHomeRunManager.getStoredTunerName(),
+                    tunerIp = hdHomeRunManager.getStoredTunerIp()
+                )
+            }
+            loadEpgData(forceRefresh = false)
+
+            if (hdHomeRunManager.getStoredTunerIp() == null) {
+                scanForTuner(silent = true)
+            }
+        }
+    }
+
+    fun scanForTuner(silent: Boolean = false) {
+        viewModelScope.launch {
+            if (!silent) _uiState.update { it.copy(isScanningTuner = true) }
+            val discovered = hdHomeRunManager.discoverTuner()
+            if (discovered != null) {
+                val updatedTunerChannels = hdHomeRunManager.getTunerChannels(forceRefresh = true)
+                tunerChannels = updatedTunerChannels
+                val activeChannels = settingsRepository.getFilteredChannels(
+                    _uiState.value.selectedBroadcaster,
+                    _uiState.value.channelSortOrder,
+                    tunerChannels
+                )
+                _uiState.update {
+                    it.copy(
+                        isScanningTuner = false,
+                        tunerChannels = updatedTunerChannels,
+                        channels = activeChannels,
+                        tunerName = discovered.friendlyName ?: "HDHomeRun",
+                        tunerIp = discovered.localIp
+                    )
+                }
+                loadEpgData(forceRefresh = false)
+            } else {
+                if (!silent) _uiState.update { it.copy(isScanningTuner = false) }
+            }
+        }
+    }
+
     fun loadEpgData(forceRefresh: Boolean = false) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             try {
-                val activeChannels = settingsRepository.getFilteredChannels(null)
+                val activeChannels = settingsRepository.getFilteredChannels(
+                    _uiState.value.selectedBroadcaster,
+                    _uiState.value.channelSortOrder,
+                    tunerChannels
+                )
+                val tunerGuide = if (tunerChannels.isNotEmpty()) {
+                    hdHomeRunManager.getTunerGuide(tunerChannels)
+                } else {
+                    emptyMap()
+                }
                 val schedule = repository.loadSchedule(
                     forceRefresh = forceRefresh,
-                    channels = activeChannels
+                    channels = activeChannels,
+                    tunerGuideSchedules = tunerGuide
                 )
 
                 // Select initial focused programme on the first enabled channel
@@ -118,7 +189,11 @@ class EpgViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectBroadcaster(broadcaster: Broadcaster?) {
-        val filtered = settingsRepository.getFilteredChannels(broadcaster)
+        val filtered = settingsRepository.getFilteredChannels(
+            broadcaster,
+            _uiState.value.channelSortOrder,
+            tunerChannels
+        )
         _uiState.update { current ->
             val firstChannel = filtered.firstOrNull()
             val liveProg = firstChannel?.let { ch ->
@@ -136,7 +211,11 @@ class EpgViewModel(application: Application) : AndroidViewModel(application) {
     fun setChannelSortOrder(sortOrder: ChannelSortOrder) {
         settingsRepository.setChannelSortOrder(sortOrder)
         val current = _uiState.value
-        val sortedChannels = settingsRepository.getFilteredChannels(current.selectedBroadcaster, sortOrder)
+        val sortedChannels = settingsRepository.getFilteredChannels(
+            current.selectedBroadcaster,
+            sortOrder,
+            tunerChannels
+        )
         val firstChannel = sortedChannels.firstOrNull()
         val firstProgramme = firstChannel?.let { channel ->
             current.scheduleMap[channel.id]?.firstOrNull { it.isLiveNow(current.currentTimeSeconds) }
@@ -199,7 +278,11 @@ class EpgViewModel(application: Application) : AndroidViewModel(application) {
             null
         }
 
-        val updatedChannels = settingsRepository.getFilteredChannels(selectedBroadcaster)
+        val updatedChannels = settingsRepository.getFilteredChannels(
+            selectedBroadcaster,
+            _uiState.value.channelSortOrder,
+            tunerChannels
+        )
         val currentFocusedChannel = _uiState.value.focusedChannel
         val newFocusedChannel = if (currentFocusedChannel != null && currentFocusedChannel in updatedChannels) {
             currentFocusedChannel

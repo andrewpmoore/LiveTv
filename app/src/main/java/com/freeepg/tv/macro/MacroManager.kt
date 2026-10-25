@@ -220,6 +220,10 @@ object MacroManager {
                     )
                 )
             }
+
+            Broadcaster.TUNER -> {
+                // Tuner streams play directly via media player; no broadcaster app UI automation needed
+            }
         }
 
         return steps

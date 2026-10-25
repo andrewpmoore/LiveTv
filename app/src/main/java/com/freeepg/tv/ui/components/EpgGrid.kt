@@ -27,6 +27,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,6 +35,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -60,6 +63,7 @@ import com.freeepg.tv.ui.theme.TextSecondary
 import com.freeepg.tv.ui.theme.TimelineDividerColor
 import kotlinx.coroutines.launch
 import kotlin.math.max
+import kotlin.math.ceil
 
 const val SLOT_DURATION_SECONDS: Long = 1800L // 30 minutes
 val SLOT_WIDTH_30MIN: Dp = 120.dp
@@ -88,6 +92,19 @@ fun EpgGrid(
     val channelColumnWidth = 165.dp
     val verticalListState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp
+    val slotWidthPx = with(density) { SLOT_WIDTH_30MIN.toPx().toInt().coerceAtLeast(1) }
+    val firstVisibleSlot by remember(horizontalScrollState, slotWidthPx) {
+        derivedStateOf { horizontalScrollState.value / slotWidthPx }
+    }
+    val visibleSlotCount = ceil(
+        (screenWidthDp.dp - channelColumnWidth).coerceAtLeast(0.dp).value / SLOT_WIDTH_30MIN.value
+    ).toInt()
+    val renderWindowStartSeconds = timelineStartSeconds +
+        (max(0, firstVisibleSlot - 2) * SLOT_DURATION_SECONDS)
+    val renderWindowEndSeconds = timelineStartSeconds +
+        ((firstVisibleSlot + visibleSlotCount + 2).coerceAtMost(totalSlots) * SLOT_DURATION_SECONDS)
 
     // Map of FocusRequesters for each channel's "NOW" programme
     val nowFocusRequesters = remember { mutableMapOf<String, FocusRequester>() }
@@ -369,6 +386,8 @@ fun EpgGrid(
                                             cellWidth = cellWidth,
                                             visibleStartSeconds = visibleStartSeconds,
                                             visibleEndSeconds = visibleEndSeconds,
+                                            isWithinRenderWindow = visibleEndSeconds > renderWindowStartSeconds &&
+                                                    visibleStartSeconds < renderWindowEndSeconds,
                                             height = ROW_HEIGHT_CHANNEL,
                                             onFocused = onProgrammeFocused,
                                             onClick = onProgrammeClick

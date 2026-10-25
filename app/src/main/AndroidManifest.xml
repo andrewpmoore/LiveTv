@@ -43,10 +43,16 @@
         <!-- Channel 5 / My5 -->
         <package android:name="com.channel5.my5" />
         <package android:name="com.mobileiq.demand5" />
-        <package android:name="com.channel5.my5.androidtv" />
-        <package android:name="com.my5.tv" />
-        <package android:name="com.my5.androidtv" />
+        <!-- HDHomeRun & Media Players -->
+        <package android:name="com.silicondust.view" />
+        <package android:name="org.videolan.vlc" />
+        <package android:name="com.brouken.player" />
+        <package android:name="org.courville.nova" />
 
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="video/*" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="https" />
@@ -97,6 +103,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:supportsRtl="true"
+        android:usesCleartextTraffic="true"
         android:theme="@style/Theme.FreeEPG">
 
         <activity

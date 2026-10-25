@@ -12,9 +12,17 @@ data class Channel(
      * Specific deep link URIs to launch directly into the live broadcast stream on Android TV.
      * Ordered from highest priority (specific live intent) to generic fallback.
      */
-    val deepLinkUris: List<String>,
-    val webLiveUrl: String
+    val deepLinkUris: List<String> = emptyList(),
+    val webLiveUrl: String = "",
+    val streamUrl: String? = null,
+    val overlappingAppChannelId: String? = null
 ) {
+    val isTunerChannel: Boolean
+        get() = broadcaster == Broadcaster.TUNER || streamUrl != null
+
+    val isOverlappingWithApp: Boolean
+        get() = overlappingAppChannelId != null
+
     companion object {
         val ALL_CHANNELS: List<Channel> = listOf(
             // === BBC iPlayer ===

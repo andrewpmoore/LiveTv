@@ -27,7 +27,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -63,10 +65,15 @@ fun SettingsDialog(
     focusRequestId: Int,
     isMacroEnabled: Boolean,
     isAccessibilityServiceActive: Boolean,
+    tunerChannelsCount: Int = 0,
+    tunerName: String? = null,
+    tunerIp: String? = null,
+    isScanningTuner: Boolean = false,
     onToggleBroadcaster: (Broadcaster) -> Unit,
     onChannelSortOrderSelected: (ChannelSortOrder) -> Unit,
     onToggleMacro: () -> Unit,
     onOpenAccessibilitySettings: () -> Unit,
+    onScanTuner: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     BackHandler { onDismiss() }
@@ -232,13 +239,40 @@ fun SettingsDialog(
                         // Broadcaster Options List
                         items(Broadcaster.values()) { broadcaster ->
                             val isEnabled = broadcaster in enabledBroadcasters
-                            val channelsCount = Channel.ALL_CHANNELS.count { it.broadcaster == broadcaster }
+                            val channelsCount = if (broadcaster == Broadcaster.TUNER) {
+                                tunerChannelsCount
+                            } else {
+                                Channel.ALL_CHANNELS.count { it.broadcaster == broadcaster }
+                            }
 
                             BroadcasterToggleRow(
                                 broadcaster = broadcaster,
                                 isEnabled = isEnabled,
                                 channelsCount = channelsCount,
                                 onToggle = { onToggleBroadcaster(broadcaster) },
+                            )
+                        }
+
+                        // Section: HDHomeRun TV Tuner
+                        item {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "HDHOMERUN TV TUNER",
+                                color = Color(0xFF00B0FF),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.8.sp,
+                                modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 4.dp)
+                            )
+                        }
+
+                        item {
+                            HdHomeRunStatusRow(
+                                tunerName = tunerName,
+                                tunerIp = tunerIp,
+                                channelsCount = tunerChannelsCount,
+                                isScanning = isScanningTuner,
+                                onScan = onScanTuner
                             )
                         }
 
@@ -751,5 +785,129 @@ private fun CloseButton(onClick: () -> Unit) {
             tint = if (isFocused) Color.White else TextSecondary,
             modifier = Modifier.size(16.dp)
         )
+    }
+}
+
+@Composable
+private fun HdHomeRunStatusRow(
+    tunerName: String?,
+    tunerIp: String?,
+    channelsCount: Int,
+    isScanning: Boolean,
+    onScan: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused = interactionSource.collectIsFocusedAsState().value
+
+    val backgroundModifier = if (isFocused) {
+        Modifier.background(
+            Brush.horizontalGradient(
+                listOf(Color(0xFF00B0FF).copy(alpha = 0.25f), Color(0xFF1E283C))
+            ),
+            RoundedCornerShape(10.dp)
+        )
+    } else {
+        Modifier.background(
+            Color(0xFF111726),
+            RoundedCornerShape(10.dp)
+        )
+    }
+
+    val borderModifier = if (isFocused) {
+        Modifier.border(
+            1.5.dp,
+            BorderFocused,
+            RoundedCornerShape(10.dp)
+        )
+    } else {
+        Modifier.border(
+            1.5.dp,
+            Color(0x1FFFFFFF),
+            RoundedCornerShape(10.dp)
+        )
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onScan
+            )
+            .focusable(interactionSource = interactionSource)
+            .then(backgroundModifier)
+            .then(borderModifier)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Tuner Icon
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xFF00B0FF).copy(alpha = 0.2f))
+                .border(0.5.dp, Color(0xFF00B0FF).copy(alpha = 0.6f), RoundedCornerShape(8.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Tv,
+                contentDescription = null,
+                tint = Color(0xFF00B0FF),
+                modifier = Modifier.size(20.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(14.dp))
+
+        // Title & Description
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = tunerName ?: "HDHomeRun Tuner",
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.5.sp
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                if (!tunerIp.isNullOrBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0x2200E676))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = tunerIp,
+                            color = Color(0xFF00E676),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "Broadcaster apps are preferred when available; tuner streams cover other channels • $channelsCount channels loaded",
+                color = TextTertiary,
+                fontSize = 10.5.sp
+            )
+        }
+
+        // Action button to scan/refresh
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color(0xFF00B0FF).copy(alpha = if (isFocused) 0.35f else 0.18f))
+                .border(1.dp, Color(0xFF00B0FF).copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+                .padding(horizontal = 10.dp, vertical = 5.dp)
+        ) {
+            Text(
+                text = if (isScanning) "Scanning..." else "Scan LAN \u21bb",
+                color = Color(0xFF00B0FF),
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp
+            )
+        }
     }
 }

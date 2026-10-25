@@ -1,84 +1,58 @@
-# FreeEPG TV for Android TV / Google TV
+# Live TV for Android TV and Google TV
 
-A premier 10-foot Electronic Programme Guide (EPG) built in **Kotlin** with **Jetpack Compose for TV**, covering the major UK free-to-air public service streaming platforms for the next 24 hours:
+Live TV is a UK electronic programme guide (EPG) for Android TV and Google TV. Browse current and upcoming programmes, filter by broadcaster, and open supported streams in their broadcaster apps using the remote.
 
-* **BBC iPlayer** (BBC One HD, BBC Two HD, BBC Three HD, BBC Four HD, BBC News HD, CBBC HD, CBeebies HD)
-* **ITVX** (ITV1 HD, ITV2 HD, ITV3 HD, ITV4 HD, ITVBe)
-* **Channel 4** (Channel 4 HD, E4 HD, More4 HD, Film4 HD, 4seven)
-* **Channel 5 / My5** (5 HD, 5ACTION, 5STAR, 5 USA, 5DRAMA)
-* **U / UKTV** (U&Dave HD, U&Drama, U&Yesterday, U&W, U&Alibi HD)
+## Screenshots
 
----
+### EPG guide
 
-## Key Features
+![Live TV EPG guide showing channel numbers and current programme listings](docs/images/epg-guide.png)
 
-1. **Next 24 Hours Real-Time Schedules**:
-   - Fetches live program listings and detailed metadata directly via unauthenticated real-time linear EPG services.
-   - Automatically synchronizes across days (today + tomorrow) to ensure a complete continuous 24-hour window.
-   - In-memory and persistent disk caching for instantaneous 0-second launch times and offline resilience.
+### Settings
 
-2. **Rich Dynamic Hero Detail Pane**:
-   - As you navigate the guide using the D-pad, the top hero pane instantly updates with:
-     - Programme Title and Broadcaster Brand badge (BBC Red, ITV Gold, Channel 4 Green, Channel 5 Magenta, U Teal)
-     - Broadcast time window and duration (e.g. `10:30 - 11:45 • 75m`)
-     - **● LIVE NOW** indicator and real-time elapsed progress bar (`65% completed`)
-     - Metadata pills: **HD**, **NEW**, **Series & Episode Number**, **Subtitles [S]**, **Audio Description [AD]**
-     - Full synopsis and episode description
-     - Direct prompt hint: `Press [OK] to Watch Live on {Broadcaster}`
+![Live TV settings for channel ordering, broadcaster filters, and accessibility integration](docs/images/settings.png)
 
-3. **Direct Broadcaster Deep Linking**:
-   - Selecting a currently-playing programme launches directly into that channel's live broadcast stream or broadcaster application.
-   - Resilient intent hierarchy:
-     1. Direct live stream custom URIs (`bbc://iplayer/playback/...`, `https://www.channel4.com/now/...`, `https://www.itv.com/watch/live/...`, etc.)
-     2. Generic stream intents
-     3. Broadcaster application launch intents
-     4. Fallback dialog allowing 1-click installation from the **Google Play Store** or web stream playback.
+## Features
 
-4. **10-Foot Leanback Design**:
-   - Full D-pad remote control support with glow focus borders and subtle scale animations.
-   - Synchronized horizontal time headers (30-minute intervals: `10:30`, `11:00`, `11:30`...).
-   - Fixed channel sidebar on the left.
-   - Prominent red **NOW** needle across the entire guide grid.
-   - Broadcaster filter tabs along the top to filter between "All Channels", "BBC iPlayer", "ITVX", "Channel 4", "Channel 5", and "U".
+- TV remote navigation with a horizontally scrolling programme timeline and a live “Now” marker.
+- Programme details, broadcast times, live status, artwork, and available metadata.
+- Filters for BBC iPlayer, ITVX, Channel 4, Channel 5 / My5, U / UKTV, and TV Tuner.
+- Optional HDHomeRun discovery and tuner streams, with broadcaster-app links preferred for channels available in both places.
+- Channel order preferences: by channel number, provider, or alphabetically. New installs default to channel number.
+- Optional accessibility service for automating navigation in supported broadcaster apps after selecting a live programme.
+- Cached programme data to make the guide useful when the network is unavailable.
 
----
+## Download and install
 
-## Download & Installation
+Download the latest APK from [GitHub Releases](https://github.com/andrewpmoore/LiveTv/releases/latest). Transfer it to the TV and open it with a file manager, or install it over ADB:
 
-### 📥 1. Download Release APK (Easiest)
-Download the latest ready-to-install release APK directly from GitHub Releases:
-👉 **[Download Latest APK from GitHub Releases](https://github.com/andrewpmoore/LiveTv/releases/latest)**
+```sh
+adb connect <TV_IP_ADDRESS>:5555
+adb install -r LiveTv.apk
+```
 
-Transfer the downloaded APK to your Android TV (via USB flash drive, [Send Files to TV](https://play.google.com/store/apps/details?id=com.yablio.sendfilestotv), or cloud storage) and open it with a file manager to install.
+Enable Developer Options and ADB debugging on the TV first. On Google TV Streamer, find these under **Settings → System → About** and **Settings → System → Developer options**.
 
----
+## Build from source
 
-### 💻 2. Install via ADB (Network or USB)
-1. Enable **Developer Options** and **ADB Debugging** on your Android TV device:
-   - Go to `Settings > Device Preferences > About > Build` and click **Build** 7 times.
-   - Go to `Settings > Device Preferences > Developer Options` and enable `Network Debugging` (or `USB Debugging`).
-2. Connect to your Android TV IP address from your terminal:
-   ```bash
-   adb connect <TV_IP_ADDRESS>:5555
-   ```
-3. Install the APK:
-   ```bash
-   adb install -r app/build/outputs/apk/debug/app-debug.apk
-   ```
+Requirements: Java 17 and Android SDK 35.
 
----
-
-## Building from Source
-
-Requirements:
-- Java 17 (`openjdk@17`)
-- Android SDK (API 34/35)
-
-```bash
-# Build Debug APK
+```sh
 ./gradlew assembleDebug
-
-# Run Unit Tests
 ./gradlew test
 ```
-# LiveTv
+
+The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
+
+## Release signing
+
+Release builds use a persistent keystore so Android accepts later APKs as in-place updates. The GitHub Actions release workflow expects these repository secrets:
+
+- `ANDROID_KEYSTORE_BASE64`: base64-encoded `.jks` keystore
+- `ANDROID_KEYSTORE_PASSWORD`
+- `ANDROID_KEY_ALIAS`
+- `ANDROID_KEY_PASSWORD`
+
+Create the keystore once, keep a secure backup, and add the encoded keystore and passwords under **Settings → Secrets and variables → Actions** in GitHub. Keep using the same key for every release. The workflow stops if any signing secret is missing.
+
+APK releases published before persistent signing used the CI debug key. Android may require uninstalling one of those APKs before installing the first APK signed with the persistent key; if so, enable the Live TV accessibility service again after installing it. Later updates signed with the persistent key retain that setting.

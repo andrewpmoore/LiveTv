@@ -70,6 +70,22 @@ enum class Broadcaster(
             "com.my5.androidtv"
         ),
         defaultWebBaseUrl = "https://www.channel5.com"
+    ),
+    TUNER(
+        id = "tuner",
+        displayName = "TV Tuner",
+        shortName = "Tuner",
+        badgeText = "TUNER",
+        brandColor = Color(0xFF00B0FF),
+        brandGradient = listOf(Color(0xFF00E5FF), Color(0xFF0091EA)),
+        primaryPackage = "com.silicondust.view",
+        alternativePackages = listOf(
+            "org.videolan.vlc",
+            "com.brouken.player",
+            "org.courville.nova",
+            "com.mxtech.videoplayer.ad"
+        ),
+        defaultWebBaseUrl = "http://api.hdhomerun.com"
     );
 
     val allPackages: List<String>

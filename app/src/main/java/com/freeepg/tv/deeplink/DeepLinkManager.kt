@@ -21,7 +21,6 @@ sealed class LaunchResult {
     ) : LaunchResult()
     data class Failure(val reason: String) : LaunchResult()
 }
-
 class DeepLinkManager(private val context: Context) {
 
     companion object {
@@ -52,6 +51,24 @@ class DeepLinkManager(private val context: Context) {
      * accessibility macro navigate its live-channel menus.
      */
     fun launchLiveProgramme(channel: Channel, programme: Programme): LaunchResult {
+        // Prefer the broadcaster app for channels it supports. The tuner is the
+        // fallback for app channels that are unavailable and the primary route
+        // for tuner-exclusive channels.
+        if (channel.broadcaster == Broadcaster.TUNER || channel.streamUrl != null) {
+            val appChannel = channel.overlappingAppChannelId?.let { appChannelId ->
+                Channel.ALL_CHANNELS.firstOrNull { it.id == appChannelId }
+            }
+            if (appChannel != null && findInstalledPackage(appChannel.broadcaster) != null) {
+                return launchLiveProgramme(appChannel, programme)
+            }
+
+            val streamUrl = channel.streamUrl
+            if (!streamUrl.isNullOrBlank()) {
+                return launchTunerStream(streamUrl, channel.name)
+            }
+            return LaunchResult.Failure("No tuner stream is available for ${channel.shortName}")
+        }
+
         val installedPackage = findInstalledPackage(channel.broadcaster)
 
         if (installedPackage == null) {
@@ -258,6 +275,37 @@ class DeepLinkManager(private val context: Context) {
             true
         } catch (e: Exception) {
             false
+        }
+    }
+
+    /**
+     * Plays an HDHomeRun live broadcast MPEG-TS stream in the preferred TV video player (VLC, Just Player, HDHomeRun View, etc.).
+     */
+    fun launchTunerStream(streamUrl: String, channelName: String): LaunchResult {
+        return try {
+            val streamUri = Uri.parse(streamUrl)
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(streamUri, "video/*")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            LaunchResult.Success(
+                destination = channelName,
+                method = "TV Tuner Player: $streamUrl"
+            )
+        } catch (e: Exception) {
+            try {
+                val generalIntent = Intent(Intent.ACTION_VIEW, Uri.parse(streamUrl)).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(generalIntent)
+                LaunchResult.Success(
+                    destination = channelName,
+                    method = "Media Player: $streamUrl"
+                )
+            } catch (e2: Exception) {
+                LaunchResult.Failure("Unable to open media player for stream: $streamUrl")
+            }
         }
     }
 }

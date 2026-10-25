@@ -33,8 +33,30 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Configure persistent release signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "Missing GitHub Actions secret: ${name}"
+              exit 1
+            fi
+          done
+          KEYSTORE_PATH="$RUNNER_TEMP/livetv-release.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          echo "ANDROID_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+
       - name: Build Release APK
         run: ./gradlew assembleRelease --stacktrace
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
       - name: Determine Tag Name
         id: tag_info
@@ -66,6 +88,7 @@ jobs:
             - Complete 24-hour linear EPG for UK free-to-air channels (BBC, ITV, Channel 4, Channel 5, U/UKTV).
             - Real-time now/next guide and dynamic hero detail pane with broadcast metadata.
             - Direct deep linking into live channel playback across broadcaster apps.
+            - Optional HDHomeRun tuner discovery and live stream playback.
             - 10-foot TV UI optimized for D-pad remote controls.
           draft: false
           prerelease: false

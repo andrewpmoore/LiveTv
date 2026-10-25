@@ -53,23 +53,16 @@ class EpgRepository(
      */
     suspend fun loadSchedule(
         forceRefresh: Boolean = false,
-        channels: List<Channel> = Channel.ALL_CHANNELS
+        channels: List<Channel> = Channel.ALL_CHANNELS,
+        tunerGuideSchedules: Map<String, List<Programme>> = emptyMap()
     ): Map<String, List<Programme>> = withContext(Dispatchers.IO) {
         val nowSeconds = System.currentTimeMillis() / 1000
 
-        if (!forceRefresh && inMemoryCache.isNotEmpty()) {
-            return@withContext inMemoryCache
-        }
-
         // 1. Try reading disk cache first
-        if (!forceRefresh) {
+        if (!forceRefresh && inMemoryCache.isEmpty()) {
             val diskCached = readDiskCache()
             if (diskCached.isNotEmpty()) {
                 inMemoryCache.putAll(diskCached)
-                val cacheFile = File(context.cacheDir, CACHE_FILE_NAME)
-                if (System.currentTimeMillis() - cacheFile.lastModified() < CACHE_VALIDITY_MS) {
-                    return@withContext diskCached
-                }
             }
         }
 
@@ -81,34 +74,65 @@ class EpgRepository(
             }
         }
 
-        // If we already have valid cached/bundled data, return it immediately so the UI is instantaneous
-        val cachedSnapshot = if (inMemoryCache.isNotEmpty()) HashMap(inMemoryCache) else null
-        if (cachedSnapshot != null && !forceRefresh) {
-            // Trigger background refresh with semaphore so UI is never blocked
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    val freshData = fetchScheduleFromNetwork(channels, nowSeconds)
-                    if (freshData.isNotEmpty()) {
-                        inMemoryCache.putAll(freshData)
-                        saveDiskCache(inMemoryCache)
-                        Log.d(TAG, "Background schedule refresh completed: ${freshData.size} channels")
+        // HDHomeRun channels have tuner-specific IDs which are not present in the
+        // bundled/app cache. Reuse known app-channel schedules for overlaps, then
+        // fetch any remaining requested channels instead of returning an unrelated
+        // but non-empty cache snapshot.
+        copyOverlappingChannelSchedules(channels)
+        inMemoryCache.putAll(tunerGuideSchedules)
+        val missingChannels = channels.filter { it.id !in inMemoryCache }
+
+        if (!forceRefresh && missingChannels.isEmpty()) {
+            val cacheFile = File(context.cacheDir, CACHE_FILE_NAME)
+            val cacheIsFresh = cacheFile.exists() &&
+                System.currentTimeMillis() - cacheFile.lastModified() < CACHE_VALIDITY_MS
+
+            if (cacheIsFresh || inMemoryCache.isNotEmpty()) {
+                // Keep the guide responsive while refreshing already covered data.
+                if (!cacheIsFresh) {
+                    CoroutineScope(Dispatchers.IO).launch {
+                        try {
+                            val freshData = fetchScheduleFromNetwork(channels, nowSeconds)
+                            if (freshData.isNotEmpty()) {
+                                inMemoryCache.putAll(freshData)
+                                inMemoryCache.putAll(tunerGuideSchedules)
+                                saveDiskCache(inMemoryCache)
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Background schedule refresh failed: ${e.message}")
+                        }
                     }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Background schedule refresh failed: ${e.message}")
                 }
+                return@withContext HashMap(inMemoryCache)
             }
-            return@withContext cachedSnapshot
         }
 
-        // Fetch fresh schedule data from API for today and tomorrow (guarantees next 24 hours)
-        val freshData = fetchScheduleFromNetwork(channels, nowSeconds)
+        // Fetch only missing channel IDs where possible. A forced refresh fetches
+        // all active channels; otherwise this fills tuner rows absent from cache.
+        val channelsToFetch = if (forceRefresh) channels else missingChannels
+        val freshData = fetchScheduleFromNetwork(channelsToFetch, nowSeconds)
         if (freshData.isNotEmpty()) {
             inMemoryCache.putAll(freshData)
+            inMemoryCache.putAll(tunerGuideSchedules)
             saveDiskCache(inMemoryCache)
             return@withContext inMemoryCache
         }
 
         return@withContext inMemoryCache
+    }
+
+    private fun copyOverlappingChannelSchedules(channels: List<Channel>) {
+        channels.forEach { channel ->
+            if (channel.id in inMemoryCache) return@forEach
+            val sourceId = channel.overlappingAppChannelId ?: return@forEach
+            val sourceSchedule = inMemoryCache[sourceId] ?: return@forEach
+            inMemoryCache[channel.id] = sourceSchedule.map { programme ->
+                programme.copy(
+                    id = "${channel.id}_${programme.startTimeEpochSeconds}",
+                    channelId = channel.id
+                )
+            }
+        }
     }
 
     private suspend fun fetchScheduleFromNetwork(
@@ -128,6 +152,7 @@ class EpgRepository(
         val deferredList = channels.map { channel ->
             async {
                 semaphore.withPermit {
+                    if (channel.skySid == "0") return@withPermit channel.id to emptyList<Programme>()
                     val todayEvents = api.getScheduleForChannel(todayStr, channel.skySid)
                     val tomorrowEvents = api.getScheduleForChannel(tomorrowStr, channel.skySid)
                     val combined = (todayEvents + tomorrowEvents)
