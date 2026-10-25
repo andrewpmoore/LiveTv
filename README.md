@@ -30,6 +30,8 @@ The XMLTV backup feed is downloaded only when the primary schedule is incomplete
 
 Download the latest APK from [GitHub Releases](https://github.com/andrewpmoore/LiveTv/releases/latest). Transfer it to the TV and open it with a file manager, or install it over ADB:
 
+To download directly on the TV with Downloader by AFTVnews, enter code **7661331**.
+
 ```sh
 adb connect <TV_IP_ADDRESS>:5555
 adb install -r LiveTv.apk
@@ -50,13 +52,13 @@ The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Release signing
 
-Release builds use a persistent keystore so Android accepts later APKs as in-place updates. The GitHub Actions release workflow expects these repository secrets:
+Release builds use a persistent keystore so Android accepts later APKs as in-place updates. Configure these GitHub Actions repository secrets to use it:
 
 - `ANDROID_KEYSTORE_BASE64`: base64-encoded `.jks` keystore
 - `ANDROID_KEYSTORE_PASSWORD`
 - `ANDROID_KEY_ALIAS`
 - `ANDROID_KEY_PASSWORD`
 
-Create the keystore once, keep a secure backup, and add the encoded keystore and passwords under **Settings → Secrets and variables → Actions** in GitHub. Keep using the same key for every release. The workflow stops if any signing secret is missing.
+Create the keystore once, keep a secure backup, and add the encoded keystore and passwords under **Settings → Secrets and variables → Actions** in GitHub. Keep using the same key for every release. If these secrets are incomplete, the workflow builds with a temporary CI debug key instead; Android may require uninstalling that APK before installing a later release signed with the persistent key.
 
 APK releases published before persistent signing used the CI debug key. Android may require uninstalling one of those APKs before installing the first APK signed with the persistent key; if so, enable the Live TV accessibility service again after installing it. Later updates signed with the persistent key retain that setting.
