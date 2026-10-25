@@ -159,7 +159,12 @@ class EpgViewModel(application: Application) : AndroidViewModel(application) {
                 val schedule = repository.loadSchedule(
                     forceRefresh = forceRefresh,
                     channels = activeChannels,
-                    tunerGuideSchedules = tunerGuide
+                    tunerGuideSchedules = tunerGuide,
+                    onChannelScheduleUpdated = { channelId, programmes ->
+                        _uiState.update { current ->
+                            current.copy(scheduleMap = current.scheduleMap + (channelId to programmes))
+                        }
+                    }
                 )
 
                 // Select initial focused programme on the first enabled channel

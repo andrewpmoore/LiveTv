@@ -3,6 +3,7 @@ package com.freeepg.tv.data.repository
 import android.content.Context
 import android.util.Log
 import com.freeepg.tv.data.api.SkyHawkEpgApi
+import com.freeepg.tv.data.api.XmlTvEpgApi
 import com.freeepg.tv.data.model.Broadcaster
 import com.freeepg.tv.data.model.Channel
 import com.freeepg.tv.data.model.Programme
@@ -26,7 +27,8 @@ import java.util.Locale
 
 class EpgRepository(
     private val context: Context,
-    private val api: SkyHawkEpgApi = SkyHawkEpgApi()
+    private val api: SkyHawkEpgApi = SkyHawkEpgApi(),
+    private val xmlTvApi: XmlTvEpgApi = XmlTvEpgApi(context)
 ) {
     companion object {
         private const val TAG = "EpgRepository"
@@ -54,7 +56,8 @@ class EpgRepository(
     suspend fun loadSchedule(
         forceRefresh: Boolean = false,
         channels: List<Channel> = Channel.ALL_CHANNELS,
-        tunerGuideSchedules: Map<String, List<Programme>> = emptyMap()
+        tunerGuideSchedules: Map<String, List<Programme>> = emptyMap(),
+        onChannelScheduleUpdated: ((String, List<Programme>) -> Unit)? = null
     ): Map<String, List<Programme>> = withContext(Dispatchers.IO) {
         val nowSeconds = System.currentTimeMillis() / 1000
 
@@ -86,13 +89,23 @@ class EpgRepository(
             val cacheFile = File(context.cacheDir, CACHE_FILE_NAME)
             val cacheIsFresh = cacheFile.exists() &&
                 System.currentTimeMillis() - cacheFile.lastModified() < CACHE_VALIDITY_MS
+            val nextDayIsCovered = channels.all { channel ->
+                inMemoryCache[channel.id]
+                    ?.maxOfOrNull { it.endTimeEpochSeconds }
+                    ?.let { it >= nowSeconds + 24 * 3600 }
+                    ?: false
+            }
 
             if (cacheIsFresh || inMemoryCache.isNotEmpty()) {
-                // Keep the guide responsive while refreshing already covered data.
-                if (!cacheIsFresh) {
+                // Keep the guide responsive while filling any missing next-day data.
+                if (!cacheIsFresh || !nextDayIsCovered) {
                     CoroutineScope(Dispatchers.IO).launch {
                         try {
-                            val freshData = fetchScheduleFromNetwork(channels, nowSeconds)
+                            val freshData = fetchScheduleFromNetwork(
+                                channels = channels,
+                                nowSeconds = nowSeconds,
+                                onChannelScheduleUpdated = onChannelScheduleUpdated
+                            )
                             if (freshData.isNotEmpty()) {
                                 inMemoryCache.putAll(freshData)
                                 inMemoryCache.putAll(tunerGuideSchedules)
@@ -137,7 +150,8 @@ class EpgRepository(
 
     private suspend fun fetchScheduleFromNetwork(
         channels: List<Channel>,
-        nowSeconds: Long
+        nowSeconds: Long,
+        onChannelScheduleUpdated: ((String, List<Programme>) -> Unit)? = null
     ): Map<String, List<Programme>> = coroutineScope {
         val dateFormat = SimpleDateFormat("yyyyMMdd", Locale.UK)
         val calendar = Calendar.getInstance()
@@ -165,6 +179,9 @@ class EpgRepository(
                         programme.endTimeEpochSeconds >= (nowSeconds - 7200) &&
                                 programme.startTimeEpochSeconds <= (nowSeconds + 26 * 3600)
                     }
+                    if (mappedProgrammes.isNotEmpty()) {
+                        onChannelScheduleUpdated?.invoke(channel.id, mappedProgrammes)
+                    }
                     channel.id to mappedProgrammes
                 }
             }
@@ -173,6 +190,32 @@ class EpgRepository(
         deferredList.awaitAll().forEach { (channelId, programmes) ->
             if (programmes.isNotEmpty()) {
                 resultMap[channelId] = programmes
+            }
+        }
+
+        // The XMLTV feed is a slower, larger fallback. Download it only for rows
+        // whose primary schedule does not cover the next day, then let Sky data win
+        // where both sources describe the same programme start.
+        val channelsNeedingFallback = channels.filter { channel ->
+            resultMap[channel.id]
+                ?.maxOfOrNull { it.endTimeEpochSeconds }
+                ?.let { it < nowSeconds + 24 * 3600 }
+                ?: true
+        }
+        if (channelsNeedingFallback.isNotEmpty()) {
+            try {
+                val fallbackData = xmlTvApi.getSchedules(channelsNeedingFallback, nowSeconds)
+                fallbackData.forEach { (channelId, fallbackProgrammes) ->
+                    val mergedProgrammes = (resultMap[channelId].orEmpty() + fallbackProgrammes)
+                        .distinctBy { it.startTimeEpochSeconds }
+                        .sortedBy { it.startTimeEpochSeconds }
+                    if (mergedProgrammes.isNotEmpty()) {
+                        resultMap[channelId] = mergedProgrammes
+                        onChannelScheduleUpdated?.invoke(channelId, mergedProgrammes)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "XMLTV fallback failed: ${e.message}")
             }
         }
 
