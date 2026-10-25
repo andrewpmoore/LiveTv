@@ -124,6 +124,13 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".ui.TunerPlayerActivity"
+            android:exported="false"
+            android:screenOrientation="landscape"
+            android:configChanges="orientation|keyboardHidden|screenSize|screenLayout"
+            android:theme="@style/Theme.FreeEPG" />
+
         <!-- EPG Macro Accessibility Service for automated live stream navigation -->
         <service
             android:name=".service.EpgMacroAccessibilityService"

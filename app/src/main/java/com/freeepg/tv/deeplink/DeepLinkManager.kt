@@ -51,20 +51,12 @@ class DeepLinkManager(private val context: Context) {
      * accessibility macro navigate its live-channel menus.
      */
     fun launchLiveProgramme(channel: Channel, programme: Programme): LaunchResult {
-        // Prefer the broadcaster app for channels it supports. The tuner is the
-        // fallback for app channels that are unavailable and the primary route
-        // for tuner-exclusive channels.
+        // A tuner lineup row represents the broadcast stream the user selected.
+        // Keep it in-app so playback details and tuning errors remain visible.
         if (channel.broadcaster == Broadcaster.TUNER || channel.streamUrl != null) {
-            val appChannel = channel.overlappingAppChannelId?.let { appChannelId ->
-                Channel.ALL_CHANNELS.firstOrNull { it.id == appChannelId }
-            }
-            if (appChannel != null && findInstalledPackage(appChannel.broadcaster) != null) {
-                return launchLiveProgramme(appChannel, programme)
-            }
-
             val streamUrl = channel.streamUrl
             if (!streamUrl.isNullOrBlank()) {
-                return launchTunerStream(streamUrl, channel.name)
+                return launchTunerStream(streamUrl, channel, programme)
             }
             return LaunchResult.Failure("No tuner stream is available for ${channel.shortName}")
         }
@@ -278,34 +270,27 @@ class DeepLinkManager(private val context: Context) {
         }
     }
 
-    /**
-     * Plays an HDHomeRun live broadcast MPEG-TS stream in the preferred TV video player (VLC, Just Player, HDHomeRun View, etc.).
-     */
-    fun launchTunerStream(streamUrl: String, channelName: String): LaunchResult {
+    /** Opens tuner playback in-app so playback can show the programme information overlay. */
+    private fun launchTunerStream(streamUrl: String, channel: Channel, programme: Programme): LaunchResult {
         return try {
-            val streamUri = Uri.parse(streamUrl)
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(streamUri, "video/*")
+            val intent = Intent(context, com.freeepg.tv.ui.TunerPlayerActivity::class.java).apply {
+                putExtra(com.freeepg.tv.ui.TunerPlayerActivity.EXTRA_STREAM_URL, streamUrl)
+                putExtra(com.freeepg.tv.ui.TunerPlayerActivity.EXTRA_CHANNEL_NAME, channel.shortName)
+                putExtra(com.freeepg.tv.ui.TunerPlayerActivity.EXTRA_CHANNEL_NUMBER, channel.channelNumber)
+                putExtra(com.freeepg.tv.ui.TunerPlayerActivity.EXTRA_PROGRAMME_TITLE, programme.title)
+                putExtra(com.freeepg.tv.ui.TunerPlayerActivity.EXTRA_PROGRAMME_SYNOPSIS, programme.synopsis)
+                putExtra(com.freeepg.tv.ui.TunerPlayerActivity.EXTRA_PROGRAMME_START, programme.startTimeEpochSeconds)
+                putExtra(com.freeepg.tv.ui.TunerPlayerActivity.EXTRA_PROGRAMME_DURATION, programme.durationSeconds)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
             LaunchResult.Success(
-                destination = channelName,
-                method = "TV Tuner Player: $streamUrl"
+                destination = channel.shortName,
+                method = "In-app tuner player: $streamUrl"
             )
         } catch (e: Exception) {
-            try {
-                val generalIntent = Intent(Intent.ACTION_VIEW, Uri.parse(streamUrl)).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(generalIntent)
-                LaunchResult.Success(
-                    destination = channelName,
-                    method = "Media Player: $streamUrl"
-                )
-            } catch (e2: Exception) {
-                LaunchResult.Failure("Unable to open media player for stream: $streamUrl")
-            }
+            Log.e(TAG, "Unable to start in-app tuner player for ${channel.name}", e)
+            LaunchResult.Failure("Unable to play tuner stream for ${channel.shortName}: ${e.message}")
         }
     }
 }

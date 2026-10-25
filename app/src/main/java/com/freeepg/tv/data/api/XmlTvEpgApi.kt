@@ -69,20 +69,12 @@ class XmlTvEpgApi(
         channels: List<Channel>,
         nowSeconds: Long
     ): Map<String, List<Programme>> = withContext(Dispatchers.IO) {
-        val requestedByXmlTvId = channels.mapNotNull { channel ->
-            val mappedAppChannelId = if (channel.id in xmlTvChannelIds) {
-                channel.id
-            } else {
-                channel.overlappingAppChannelId?.takeIf { it in xmlTvChannelIds }
-            } ?: return@mapNotNull null
-            xmlTvChannelIds[mappedAppChannelId]?.let { it to channel.id }
-        }.toMap()
-
-        if (requestedByXmlTvId.isEmpty()) return@withContext emptyMap()
         val file = feedMutex.withLock { getFeedFile() }
             ?: return@withContext emptyMap()
 
         try {
+            val requestedByXmlTvId = resolveRequestedChannels(file, channels)
+            if (requestedByXmlTvId.isEmpty()) return@withContext emptyMap()
             parseFeed(file, requestedByXmlTvId, nowSeconds)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to parse XMLTV backup: ${e.message}")
@@ -126,9 +118,72 @@ class XmlTvEpgApi(
         return feedCache.takeIf { it.exists() }
     }
 
+    private fun resolveRequestedChannels(
+        file: File,
+        channels: List<Channel>
+    ): Map<String, List<String>> {
+        val definitions = readChannelDefinitions(file)
+        val xmlTvIdsByName = mutableMapOf<String, MutableList<String>>()
+        definitions.forEach { (xmlTvId, displayNames) ->
+            displayNames.forEach { displayName ->
+                val nameKey = normalizeGuideName(displayName)
+                if (nameKey.isNotBlank()) {
+                    xmlTvIdsByName.getOrPut(nameKey) { mutableListOf() }.add(xmlTvId)
+                }
+            }
+        }
+
+        val result = mutableMapOf<String, MutableList<String>>()
+        channels.forEach { channel ->
+            // For tuner rows prefer the lineup's display name so regional feeds such as
+            // BBC One Yorkshire stay region-correct. Fall back to the app channel mapping
+            // for HDHomeRun names that don't match a feed display-name exactly.
+            val nameMatchedXmlTvId = if (channel.isTunerChannel) {
+                sequenceOf(channel.name, channel.shortName)
+                    .map(::normalizeGuideName)
+                    .firstNotNullOfOrNull { xmlTvIdsByName[it]?.firstOrNull() }
+            } else {
+                null
+            }
+            val appChannelId = channel.id.takeIf { it in xmlTvChannelIds }
+                ?: channel.overlappingAppChannelId?.takeIf { it in xmlTvChannelIds }
+            val xmlTvId = nameMatchedXmlTvId
+                ?: appChannelId?.let { xmlTvChannelIds[it] }
+                ?: return@forEach
+            result.getOrPut(xmlTvId) { mutableListOf() }.add(channel.id)
+        }
+        return result.mapValues { (_, channelIds) -> channelIds.distinct() }
+    }
+
+    private fun readChannelDefinitions(file: File): Map<String, List<String>> {
+        val parser = Xml.newPullParser()
+        parser.setFeature(XmlPullParser.FEATURE_PROCESS_DOCDECL, false)
+        GZIPInputStream(file.inputStream().buffered()).use { input ->
+            parser.setInput(input, "UTF-8")
+            val definitions = mutableMapOf<String, MutableList<String>>()
+            var channelId: String? = null
+
+            while (parser.next() != XmlPullParser.END_DOCUMENT) {
+                if (parser.eventType == XmlPullParser.START_TAG) {
+                    when (parser.name) {
+                        "programme" -> break
+                        "channel" -> channelId = parser.getAttributeValue(null, "id")
+                        "display-name" -> if (channelId != null) {
+                            definitions.getOrPut(channelId!!) { mutableListOf() }
+                                .add(parser.nextText().trim())
+                        }
+                    }
+                } else if (parser.eventType == XmlPullParser.END_TAG && parser.name == "channel") {
+                    channelId = null
+                }
+            }
+            return definitions
+        }
+    }
+
     private fun parseFeed(
         file: File,
-        requestedByXmlTvId: Map<String, String>,
+        requestedByXmlTvId: Map<String, List<String>>,
         nowSeconds: Long
     ): Map<String, List<Programme>> {
         val parser = Xml.newPullParser()
@@ -143,10 +198,10 @@ class XmlTvEpgApi(
                 if (parser.eventType != XmlPullParser.START_TAG || parser.name != "programme") continue
 
                 val xmlTvId = parser.getAttributeValue(null, "channel")
-                val appChannelId = requestedByXmlTvId[xmlTvId]
+                val appChannelIds = requestedByXmlTvId[xmlTvId]
                 val start = parseXmlTvTime(parser.getAttributeValue(null, "start"))
                 val stop = parseXmlTvTime(parser.getAttributeValue(null, "stop"))
-                if (appChannelId == null || start == null || start > latestStart ||
+                if (appChannelIds.isNullOrEmpty() || start == null || start > latestStart ||
                     (stop != null && stop < earliestStart)
                 ) {
                     skipElement(parser)
@@ -171,19 +226,21 @@ class XmlTvEpgApi(
 
                 val cleanTitle = title?.takeIf { it.isNotBlank() } ?: continue
                 val end = (stop ?: (start + 30 * 60)).coerceAtLeast(start + 60)
-                val programme = Programme(
-                    id = "${appChannelId}_$start",
-                    channelId = appChannelId,
-                    title = cleanTitle,
-                    synopsis = description?.takeIf { it.isNotBlank() } ?: "No description available.",
-                    startTimeEpochSeconds = start,
-                    durationSeconds = end - start,
-                    isHd = xmlTvId.orEmpty().contains(".HD."),
-                    isNew = false,
-                    hasSubtitles = hasSubtitles,
-                    hasAudioDescription = false
-                )
-                result.getOrPut(appChannelId) { mutableListOf() }.add(programme)
+                appChannelIds.forEach { appChannelId ->
+                    val programme = Programme(
+                        id = "${appChannelId}_$start",
+                        channelId = appChannelId,
+                        title = cleanTitle,
+                        synopsis = description?.takeIf { it.isNotBlank() } ?: "No description available.",
+                        startTimeEpochSeconds = start,
+                        durationSeconds = end - start,
+                        isHd = xmlTvId.orEmpty().contains(".HD."),
+                        isNew = false,
+                        hasSubtitles = hasSubtitles,
+                        hasAudioDescription = false
+                    )
+                    result.getOrPut(appChannelId) { mutableListOf() }.add(programme)
+                }
             }
 
             return result.mapValues { (_, programmes) ->
@@ -222,4 +279,11 @@ class XmlTvEpgApi(
         }
         return null
     }
+
+    private fun normalizeGuideName(value: String): String = value
+        .lowercase(Locale.UK)
+        .replace("&", " and ")
+        .replace(Regex("^uk\\s*-?\\s*"), "")
+        .replace(Regex("\\b(high definition|hd|sd)\\b"), "")
+        .replace(Regex("[^a-z0-9]"), "")
 }
