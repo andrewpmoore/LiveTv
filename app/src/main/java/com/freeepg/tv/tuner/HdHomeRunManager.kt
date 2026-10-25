@@ -51,24 +51,36 @@ class HdHomeRunManager(private val context: Context) {
         ): List<Channel> {
             val appChannels = Channel.ALL_CHANNELS
 
-            return items.map { item ->
-                val overlappingAppChannel = findOverlappingAppChannel(item, appChannels)
-                val skySid = overlappingAppChannel?.skySid ?: lookupTunerExclusiveSkySid(item.guideNumber, item.guideName)
+            return items
+                .filterNot(::isHiddenLineupItem)
+                .map { item ->
+                    val overlappingAppChannel = findOverlappingAppChannel(item, appChannels)
+                    val skySid = overlappingAppChannel?.skySid
+                        ?: lookupTunerExclusiveSkySid(item.guideNumber, item.guideName)
 
-                Channel(
-                    id = "tuner_${item.guideNumber}",
-                    skySid = skySid,
-                    channelNumber = item.guideNumber,
-                    name = item.guideName,
-                    shortName = overlappingAppChannel?.shortName ?: item.guideName,
-                    broadcaster = Broadcaster.TUNER,
-                    logoUrl = overlappingAppChannel?.logoUrl ?: lookupTunerLogo(item.guideName),
-                    deepLinkUris = overlappingAppChannel?.deepLinkUris ?: emptyList(),
-                    webLiveUrl = overlappingAppChannel?.webLiveUrl ?: item.url,
-                    streamUrl = normalizeTunerStreamUrl(item.url, tunerIp),
-                    overlappingAppChannelId = overlappingAppChannel?.id
-                )
-            }
+                    Channel(
+                        id = "tuner_${item.guideNumber}",
+                        skySid = skySid,
+                        channelNumber = item.guideNumber,
+                        name = item.guideName,
+                        shortName = overlappingAppChannel?.shortName ?: item.guideName,
+                        broadcaster = Broadcaster.TUNER,
+                        logoUrl = overlappingAppChannel?.logoUrl ?: lookupTunerLogo(item.guideName),
+                        deepLinkUris = overlappingAppChannel?.deepLinkUris ?: emptyList(),
+                        webLiveUrl = overlappingAppChannel?.webLiveUrl ?: item.url,
+                        streamUrl = normalizeTunerStreamUrl(item.url, tunerIp),
+                        overlappingAppChannelId = overlappingAppChannel?.id
+                    )
+                }
+        }
+
+        private fun isHiddenLineupItem(item: HdHomeRunLineupItem): Boolean {
+            val guideNumber = item.guideNumber.trim().toIntOrNull()
+            val guideName = item.guideName.trim()
+            return guideName.equals("Unknown", ignoreCase = true) ||
+                guideName.startsWith("Unknown ", ignoreCase = true) ||
+                guideName.isBlank() ||
+                guideNumber?.let { it in 700..799 || it >= 5000 } == true
         }
 
         private fun normalizeTunerStreamUrl(streamUrl: String, tunerIp: String): String {
