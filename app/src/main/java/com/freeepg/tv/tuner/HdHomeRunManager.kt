@@ -2,6 +2,7 @@ package com.freeepg.tv.tuner
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.net.Uri
 import android.util.Log
 import com.freeepg.tv.data.model.Broadcaster
 import com.freeepg.tv.data.model.Channel
@@ -64,10 +65,26 @@ class HdHomeRunManager(private val context: Context) {
                     logoUrl = overlappingAppChannel?.logoUrl ?: lookupTunerLogo(item.guideName),
                     deepLinkUris = overlappingAppChannel?.deepLinkUris ?: emptyList(),
                     webLiveUrl = overlappingAppChannel?.webLiveUrl ?: item.url,
-                    streamUrl = item.url,
+                    streamUrl = normalizeTunerStreamUrl(item.url, tunerIp),
                     overlappingAppChannelId = overlappingAppChannel?.id
                 )
             }
+        }
+
+        private fun normalizeTunerStreamUrl(streamUrl: String, tunerIp: String): String {
+            return runCatching {
+                val uri = Uri.parse(streamUrl)
+                val host = uri.host.orEmpty()
+                if (!host.endsWith(".local", ignoreCase = true) || tunerIp.isBlank() || ':' in tunerIp) {
+                    streamUrl
+                } else {
+                    val authority = if (uri.port >= 0) "$tunerIp:${uri.port}" else tunerIp
+                    uri.buildUpon()
+                        .encodedAuthority(authority)
+                        .build()
+                        .toString()
+                }
+            }.getOrDefault(streamUrl)
         }
 
         /**
