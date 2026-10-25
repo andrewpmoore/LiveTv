@@ -25,6 +25,7 @@ data class EpgUiState(
     val selectedBroadcaster: Broadcaster? = null,
     val enabledBroadcasters: Set<Broadcaster> = SettingsRepository.DEFAULT_BROADCASTERS,
     val channelSortOrder: ChannelSortOrder = ChannelSortOrder.NUMBER,
+    val showAdultChannels: Boolean = SettingsRepository.DEFAULT_SHOW_ADULT_CHANNELS,
     val channels: List<Channel> = Channel.ALL_CHANNELS,
     val scheduleMap: Map<String, List<Programme>> = emptyMap(),
     val focusedProgramme: Programme? = null,
@@ -66,6 +67,7 @@ class EpgViewModel(application: Application) : AndroidViewModel(application) {
         EpgUiState(
             enabledBroadcasters = settingsRepository.getEnabledBroadcasters(),
             channelSortOrder = settingsRepository.getChannelSortOrder(),
+            showAdultChannels = settingsRepository.isAdultChannelsEnabled(),
             channels = settingsRepository.getFilteredChannels(null)
         )
     )
@@ -232,6 +234,33 @@ class EpgViewModel(application: Application) : AndroidViewModel(application) {
                 channels = sortedChannels,
                 focusedChannel = firstChannel ?: it.focusedChannel,
                 focusedProgramme = firstProgramme
+            )
+        }
+    }
+
+    fun toggleAdultChannels() {
+        val enabled = !settingsRepository.isAdultChannelsEnabled()
+        settingsRepository.setAdultChannelsEnabled(enabled)
+
+        val current = _uiState.value
+        val filteredChannels = settingsRepository.getFilteredChannels(
+            current.selectedBroadcaster,
+            current.channelSortOrder,
+            tunerChannels
+        )
+        val focusedChannel = current.focusedChannel?.takeIf { it in filteredChannels }
+            ?: filteredChannels.firstOrNull()
+        val focusedProgramme = focusedChannel?.let { channel ->
+            current.scheduleMap[channel.id]?.firstOrNull { it.isLiveNow(current.currentTimeSeconds) }
+                ?: current.scheduleMap[channel.id]?.firstOrNull()
+        }
+
+        _uiState.update {
+            it.copy(
+                showAdultChannels = enabled,
+                channels = filteredChannels,
+                focusedChannel = focusedChannel,
+                focusedProgramme = focusedProgramme ?: it.focusedProgramme
             )
         }
     }

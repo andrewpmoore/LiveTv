@@ -188,6 +188,7 @@ fun MainEpgScreen(viewModel: EpgViewModel) {
         SettingsDialog(
             enabledBroadcasters = state.enabledBroadcasters,
             channelSortOrder = state.channelSortOrder,
+            showAdultChannels = state.showAdultChannels,
             focusRequestId = state.settingsFocusRequestId,
             isMacroEnabled = state.isMacroEnabled,
             isAccessibilityServiceActive = state.isAccessibilityServiceActive,
@@ -200,6 +201,9 @@ fun MainEpgScreen(viewModel: EpgViewModel) {
             },
             onChannelSortOrderSelected = { sortOrder ->
                 viewModel.setChannelSortOrder(sortOrder)
+            },
+            onToggleAdultChannels = {
+                viewModel.toggleAdultChannels()
             },
             onToggleMacro = {
                 viewModel.toggleMacroAutoLaunch()

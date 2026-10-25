@@ -22,24 +22,32 @@ class SettingsRepository(context: Context) {
         private const val KEY_MACRO_AUTO_LAUNCH = "macro_auto_launch_enabled"
         private const val KEY_CHANNEL_SORT_ORDER = "channel_sort_order"
         private const val KEY_TUNER_CONFIGURED = "tuner_configured_v1"
+        private const val KEY_SHOW_ADULT_CHANNELS = "show_adult_tuner_channels"
 
         // All broadcasters enabled by default
         val DEFAULT_BROADCASTERS: Set<Broadcaster> = Broadcaster.values().toSet()
         const val DEFAULT_MACRO_AUTO_LAUNCH: Boolean = true
+        const val DEFAULT_SHOW_ADULT_CHANNELS: Boolean = false
 
         fun filterChannels(
             allAppChannels: List<Channel>,
             selectedBroadcaster: Broadcaster?,
             enabledBroadcasters: Set<Broadcaster>,
             sortOrder: ChannelSortOrder,
-            tunerChannels: List<Channel> = emptyList()
+            tunerChannels: List<Channel> = emptyList(),
+            showAdultChannels: Boolean = DEFAULT_SHOW_ADULT_CHANNELS
         ): List<Channel> {
             val allEnabledAppChannels = allAppChannels.filter { it.broadcaster in enabledBroadcasters }
+            val visibleTunerChannels = if (showAdultChannels) {
+                tunerChannels
+            } else {
+                tunerChannels.filterNot(::isAdultTunerChannel)
+            }
 
             val filtered = when {
                 // "TV Tuner" filter selected in top filter bar
                 selectedBroadcaster == Broadcaster.TUNER -> {
-                    tunerChannels
+                    visibleTunerChannels
                 }
                 // Specific broadcaster filter (BBC, ITV, Channel 4, Channel 5)
                 selectedBroadcaster != null -> {
@@ -55,7 +63,7 @@ class SettingsRepository(context: Context) {
                     // Where there is an overlap, the app version is already in allEnabledAppChannels,
                     // so overlapping tuner channels are omitted to avoid duplicates and prioritize app streams.
                     if (Broadcaster.TUNER in enabledBroadcasters) {
-                        val tunerExclusive = tunerChannels.filter { !it.isOverlappingWithApp }
+                        val tunerExclusive = visibleTunerChannels.filter { !it.isOverlappingWithApp }
                         allEnabledAppChannels + tunerExclusive
                     } else {
                         allEnabledAppChannels
@@ -72,6 +80,9 @@ class SettingsRepository(context: Context) {
                 )
             }
         }
+
+        private fun isAdultTunerChannel(channel: Channel): Boolean =
+            channel.isTunerChannel && channel.channelNumber.toIntOrNull()?.let { it in 670..699 } == true
     }
 
     fun getEnabledBroadcasters(): Set<Broadcaster> {
@@ -135,6 +146,13 @@ class SettingsRepository(context: Context) {
         prefs.edit().putString(KEY_CHANNEL_SORT_ORDER, sortOrder.name).apply()
     }
 
+    fun isAdultChannelsEnabled(): Boolean =
+        prefs.getBoolean(KEY_SHOW_ADULT_CHANNELS, DEFAULT_SHOW_ADULT_CHANNELS)
+
+    fun setAdultChannelsEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_SHOW_ADULT_CHANNELS, enabled).apply()
+    }
+
     fun getFilteredChannels(
         selectedBroadcaster: Broadcaster?,
         sortOrder: ChannelSortOrder = getChannelSortOrder(),
@@ -145,7 +163,8 @@ class SettingsRepository(context: Context) {
             selectedBroadcaster = selectedBroadcaster,
             enabledBroadcasters = getEnabledBroadcasters(),
             sortOrder = sortOrder,
-            tunerChannels = tunerChannels
+            tunerChannels = tunerChannels,
+            showAdultChannels = isAdultChannelsEnabled()
         )
     }
 

@@ -62,6 +62,7 @@ import com.freeepg.tv.ui.theme.TextTertiary
 fun SettingsDialog(
     enabledBroadcasters: Set<Broadcaster>,
     channelSortOrder: ChannelSortOrder,
+    showAdultChannels: Boolean = false,
     focusRequestId: Int,
     isMacroEnabled: Boolean,
     isAccessibilityServiceActive: Boolean,
@@ -71,6 +72,7 @@ fun SettingsDialog(
     isScanningTuner: Boolean = false,
     onToggleBroadcaster: (Broadcaster) -> Unit,
     onChannelSortOrderSelected: (ChannelSortOrder) -> Unit,
+    onToggleAdultChannels: () -> Unit = {},
     onToggleMacro: () -> Unit,
     onOpenAccessibilitySettings: () -> Unit,
     onScanTuner: () -> Unit = {},
@@ -276,6 +278,13 @@ fun SettingsDialog(
                             )
                         }
 
+                        item {
+                            AdultChannelsToggleRow(
+                                isEnabled = showAdultChannels,
+                                onToggle = onToggleAdultChannels
+                            )
+                        }
+
                         // Section 2 Header: Auto-Stream Launcher Macro
                         item {
                             Spacer(modifier = Modifier.height(8.dp))
@@ -330,6 +339,80 @@ fun SettingsDialog(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdultChannelsToggleRow(
+    isEnabled: Boolean,
+    onToggle: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused = interactionSource.collectIsFocusedAsState().value
+    val accent = Color(0xFFFF5C8A)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onToggle)
+            .focusable(interactionSource = interactionSource)
+            .background(
+                if (isFocused) Color(0xFF262033) else Color(0xFF111726),
+                RoundedCornerShape(10.dp)
+            )
+            .border(
+                if (isFocused) 1.5.dp else 1.dp,
+                if (isFocused) accent else Color(0x1FFFFFFF),
+                RoundedCornerShape(10.dp)
+            )
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(accent.copy(alpha = if (isEnabled) 0.9f else 0.35f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("18+", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Black)
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = "Adult channels (670–699)",
+                color = if (isEnabled) TextPrimary else TextSecondary.copy(alpha = 0.75f),
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.5.sp
+            )
+            Text(
+                text = if (isEnabled) "Included in the tuner guide" else "Hidden from the tuner guide",
+                color = TextTertiary,
+                fontSize = 10.5.sp
+            )
+        }
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(14.dp))
+                .background(if (isEnabled) accent.copy(alpha = 0.2f) else Color(0x1FFFFFFF))
+                .border(1.dp, if (isEnabled) accent.copy(alpha = 0.75f) else Color(0x33FFFFFF), RoundedCornerShape(14.dp))
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (isEnabled) {
+                    Icon(Icons.Default.Check, contentDescription = null, tint = accent, modifier = Modifier.size(13.dp))
+                    Spacer(Modifier.width(4.dp))
+                }
+                Text(
+                    text = if (isEnabled) "ENABLED" else "DISABLED",
+                    color = if (isEnabled) accent else TextTertiary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 10.5.sp,
+                    letterSpacing = 0.5.sp
+                )
             }
         }
     }
