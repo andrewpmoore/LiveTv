@@ -77,6 +77,7 @@ private val NowBadgeBrush = Brush.horizontalGradient(
 
 @Composable
 fun EpgGrid(
+    firstChannelFocusRequester: FocusRequester,
     channels: List<Channel>,
     scheduleMap: Map<String, List<Programme>>,
     currentTimeSeconds: Long,
@@ -111,15 +112,15 @@ fun EpgGrid(
     val offAirFocusRequesters = remember { mutableMapOf<String, FocusRequester>() }
     channels.forEach { ch ->
         if (!nowFocusRequesters.containsKey(ch.id)) {
-            nowFocusRequesters[ch.id] = FocusRequester()
+            nowFocusRequesters[ch.id] = if (ch == channels.firstOrNull()) firstChannelFocusRequester else FocusRequester()
         }
         if ((scheduleMap[ch.id] ?: emptyList()).isEmpty() && !offAirFocusRequesters.containsKey(ch.id)) {
-            offAirFocusRequesters[ch.id] = FocusRequester()
+            offAirFocusRequesters[ch.id] = if (ch == channels.firstOrNull()) firstChannelFocusRequester else FocusRequester()
         }
     }
 
     // Pending channel target for vertical navigation between NOW programmes (starts on first channel)
-    var pendingFocusChannelId by remember { mutableStateOf<String?>(channels.firstOrNull()?.id) }
+    var pendingFocusChannelId by remember { mutableStateOf<String?>(null) }
 
     val onNavigateVerticalFromNow: (Int) -> Unit = { targetIndex ->
         val targetChannel = channels.getOrNull(targetIndex)
@@ -138,28 +139,6 @@ fun EpgGrid(
                     requester?.requestFocus()
                 } catch (e: Exception) {
                     // Handled by pendingFocusChannelId LaunchedEffect when composed
-                }
-            }
-        }
-    }
-
-    // Set initial focus to the first channel's NOW programme on load
-    LaunchedEffect(scheduleMap.isNotEmpty(), channels) {
-        if (scheduleMap.isNotEmpty() && channels.isNotEmpty()) {
-            val firstChannel = channels.first()
-            pendingFocusChannelId = firstChannel.id
-            verticalListState.scrollToItem(0)
-            val requester = if ((scheduleMap[firstChannel.id] ?: emptyList()).isEmpty()) {
-                offAirFocusRequesters[firstChannel.id]
-            } else {
-                nowFocusRequesters[firstChannel.id]
-            }
-            for (attempt in 1..25) {
-                kotlinx.coroutines.delay(50L)
-                try {
-                    requester?.requestFocus()
-                } catch (_: Exception) {
-                    // Keep retrying until first NOW cell is fully measured, laid out, and attached
                 }
             }
         }

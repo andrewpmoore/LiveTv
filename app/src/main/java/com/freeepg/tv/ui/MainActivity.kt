@@ -15,7 +15,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -56,6 +58,7 @@ fun MainEpgScreen(viewModel: EpgViewModel) {
     val state by viewModel.uiState.collectAsState()
     val horizontalScrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
+    val firstChannelFocusRequester = remember { FocusRequester() }
 
     val density = androidx.compose.ui.platform.LocalDensity.current
 
@@ -127,6 +130,17 @@ fun MainEpgScreen(viewModel: EpgViewModel) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 // 1. Broadcaster Filter & App Header
                 BroadcasterFilterBar(
+                    onNavigateToGuide = {
+                        coroutineScope.launch {
+                            repeat(20) {
+                                try {
+                                    if (firstChannelFocusRequester.requestFocus()) return@launch
+                                } catch (_: IllegalStateException) {
+                                }
+                                kotlinx.coroutines.delay(50)
+                            }
+                        }
+                    },
                     selectedBroadcaster = state.selectedBroadcaster,
                     enabledBroadcasters = state.enabledBroadcasters,
                     onSelectBroadcaster = { broadcaster ->
@@ -163,6 +177,7 @@ fun MainEpgScreen(viewModel: EpgViewModel) {
 
         // 3. EPG Guide Grid with synchronized time header and channels column
         EpgGrid(
+            firstChannelFocusRequester = firstChannelFocusRequester,
             channels = state.channels,
             scheduleMap = state.scheduleMap,
             currentTimeSeconds = state.currentTimeSeconds,

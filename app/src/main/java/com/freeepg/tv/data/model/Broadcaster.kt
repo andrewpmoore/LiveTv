@@ -73,7 +73,7 @@ enum class Broadcaster(
     ),
     TUNER(
         id = "tuner",
-        displayName = "TV Tuner",
+        displayName = "Tuner",
         shortName = "Tuner",
         badgeText = "TUNER",
         brandColor = Color(0xFF00B0FF),

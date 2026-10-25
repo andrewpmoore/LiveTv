@@ -21,11 +21,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
@@ -38,11 +36,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -117,6 +119,14 @@ fun SettingsDialog(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color(0xCC070B14))
+                .onPreviewKeyEvent { event ->
+                    if (event.type == KeyEventType.KeyDown &&
+                        (event.key == Key.Back || event.key == Key.Escape || event.key == Key.Backspace)
+                    ) {
+                        onDismiss()
+                        true
+                    } else false
+                }
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -191,8 +201,6 @@ fun SettingsDialog(
                             )
                         }
 
-                        // Close Icon Button
-                        CloseButton(onClick = onDismiss)
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -838,39 +846,6 @@ private fun AccessibilitySetupRow(
 }
 
 @Composable
-private fun CloseButton(onClick: () -> Unit) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isFocused = interactionSource.collectIsFocusedAsState().value
-
-    Box(
-        modifier = Modifier
-            .size(32.dp)
-            .clip(CircleShape)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick
-            )
-            .focusable(interactionSource = interactionSource)
-            .background(
-                if (isFocused) AccentCyan.copy(alpha = 0.25f) else Color(0x1FFFFFFF)
-            )
-            .border(
-                1.5.dp,
-                if (isFocused) BorderFocused else Color(0x33FFFFFF),
-                CircleShape
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = Icons.Default.Close,
-            contentDescription = "Close",
-            tint = if (isFocused) Color.White else TextSecondary,
-            modifier = Modifier.size(16.dp)
-        )
-    }
-}
-
 @Composable
 private fun HdHomeRunStatusRow(
     tunerName: String?,

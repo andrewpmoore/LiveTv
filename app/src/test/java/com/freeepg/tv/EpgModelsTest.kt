@@ -108,7 +108,7 @@ class EpgModelsTest {
     fun testBroadcasterTunerEnum() {
         val tuner = Broadcaster.TUNER
         assertEquals("tuner", tuner.id)
-        assertEquals("TV Tuner", tuner.displayName)
+        assertEquals("Tuner", tuner.displayName)
         assertEquals("Tuner", tuner.shortName)
         assertTrue(Broadcaster.values().contains(Broadcaster.TUNER))
     }
@@ -210,7 +210,7 @@ class EpgModelsTest {
         val tptv = allChannels.firstOrNull { it.id == "tuner_82" }
         assertNotNull("Tuner-exclusive channel Talking Pictures TV must appear in All Channels", tptv)
 
-        // 2. "TV Tuner" filter view:
+        // 2. "Tuner" filter view:
         // Must show all tuner channels (including overlapping ones)
         val tunerFilterChannels = SettingsRepository.filterChannels(
             allAppChannels = Channel.ALL_CHANNELS,

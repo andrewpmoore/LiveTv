@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
@@ -33,9 +32,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.nativeKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -54,6 +59,7 @@ import java.util.Locale
 
 @Composable
 fun BroadcasterFilterBar(
+    onNavigateToGuide: () -> Unit,
     selectedBroadcaster: Broadcaster?,
     enabledBroadcasters: Set<Broadcaster>,
     onSelectBroadcaster: (Broadcaster?) -> Unit,
@@ -95,6 +101,8 @@ fun BroadcasterFilterBar(
                 text = "All Channels",
                 isSelected = selectedBroadcaster == null,
                 accentColor = AccentCyan,
+                isDefaultFocus = true,
+                onNavigateToGuide = onNavigateToGuide,
                 onClick = { onSelectBroadcaster(null) }
             )
 
@@ -105,6 +113,7 @@ fun BroadcasterFilterBar(
                         text = broadcaster.displayName,
                         isSelected = selectedBroadcaster == broadcaster,
                         accentColor = broadcaster.brandColor,
+                        onNavigateToGuide = onNavigateToGuide,
                         onClick = { onSelectBroadcaster(broadcaster) }
                     )
                 }
@@ -116,6 +125,7 @@ fun BroadcasterFilterBar(
         TvActionButton(
             icon = Icons.Default.Schedule,
             label = "Now",
+            onNavigateToGuide = onNavigateToGuide,
             onClick = onJumpToNowClick
         )
 
@@ -126,6 +136,7 @@ fun BroadcasterFilterBar(
             icon = Icons.Default.Settings,
             label = null,
             contentDescription = "Settings",
+            onNavigateToGuide = onNavigateToGuide,
             onClick = onOpenSettingsClick
         )
 
@@ -151,6 +162,7 @@ fun BroadcasterFilterBar(
                 icon = Icons.Default.Refresh,
                 label = null,
                 contentDescription = "Refresh Guide",
+                onNavigateToGuide = onNavigateToGuide,
                 onClick = onRefreshClick
             )
         }
@@ -172,10 +184,19 @@ private fun FilterTab(
     text: String,
     isSelected: Boolean,
     accentColor: Color,
+    isDefaultFocus: Boolean = false,
+    onNavigateToGuide: () -> Unit,
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused = interactionSource.collectIsFocusedAsState().value
+    val focusRequester = remember { FocusRequester() }
+    androidx.compose.runtime.LaunchedEffect(isDefaultFocus) {
+        if (isDefaultFocus) {
+            kotlinx.coroutines.delay(100)
+            runCatching { focusRequester.requestFocus() }
+        }
+    }
 
     val backgroundModifier = when {
         isFocused -> Modifier.background(
@@ -215,6 +236,13 @@ private fun FilterTab(
 
     Box(
         modifier = Modifier
+            .then(if (isDefaultFocus) Modifier.focusRequester(focusRequester) else Modifier)
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0 && event.key == Key.DirectionDown) {
+                    onNavigateToGuide()
+                    true
+                } else false
+            }
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
             .focusable(interactionSource = interactionSource)
             .then(backgroundModifier)
@@ -236,6 +264,7 @@ private fun TvActionButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String? = null,
     contentDescription: String? = label,
+    onNavigateToGuide: () -> Unit,
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -245,6 +274,12 @@ private fun TvActionButton(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
         modifier = Modifier
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0 && event.key == Key.DirectionDown) {
+                    onNavigateToGuide()
+                    true
+                } else false
+            }
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
             .focusable(interactionSource = interactionSource)
             .background(
