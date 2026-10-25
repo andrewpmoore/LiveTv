@@ -52,8 +52,17 @@ class DeepLinkManager(private val context: Context) {
      */
     fun launchLiveProgramme(channel: Channel, programme: Programme): LaunchResult {
         // A tuner lineup row represents the broadcast stream the user selected.
-        // Keep it in-app so playback details and tuning errors remain visible.
+        // If an official broadcaster app (BBC iPlayer, ITVX, etc.) is installed on the device,
+        // prioritize it for overlapping channels per user preference (avoiding weak tuner antenna signal).
+        // Otherwise, open the tuner stream.
         if (channel.broadcaster == Broadcaster.TUNER || channel.streamUrl != null) {
+            val appChannel = channel.overlappingAppChannelId?.let { appChannelId ->
+                Channel.ALL_CHANNELS.firstOrNull { it.id == appChannelId }
+            }
+            if (appChannel != null && findInstalledPackage(appChannel.broadcaster) != null) {
+                return launchLiveProgramme(appChannel, programme)
+            }
+
             val streamUrl = channel.streamUrl
             if (!streamUrl.isNullOrBlank()) {
                 return launchTunerStream(streamUrl, channel, programme)
@@ -271,7 +280,7 @@ class DeepLinkManager(private val context: Context) {
     }
 
     /** Opens tuner playback in-app so playback can show the programme information overlay. */
-    private fun launchTunerStream(streamUrl: String, channel: Channel, programme: Programme): LaunchResult {
+    fun launchTunerStream(streamUrl: String, channel: Channel, programme: Programme): LaunchResult {
         return try {
             val intent = Intent(context, com.freeepg.tv.ui.TunerPlayerActivity::class.java).apply {
                 putExtra(com.freeepg.tv.ui.TunerPlayerActivity.EXTRA_STREAM_URL, streamUrl)
@@ -291,6 +300,35 @@ class DeepLinkManager(private val context: Context) {
         } catch (e: Exception) {
             Log.e(TAG, "Unable to start in-app tuner player for ${channel.name}", e)
             LaunchResult.Failure("Unable to play tuner stream for ${channel.shortName}: ${e.message}")
+        }
+    }
+
+    /**
+     * Plays an HDHomeRun live broadcast stream in an external media player (VLC, HDHomeRun View, Just Player, Nova).
+     */
+    fun launchExternalTunerStream(streamUrl: String): Boolean {
+        val streamUri = Uri.parse(streamUrl)
+        val pm = context.packageManager
+        for (pkg in Broadcaster.TUNER.allPackages) {
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(streamUri, "video/*")
+                setPackage(pkg)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            if (intent.resolveActivity(pm) != null) {
+                context.startActivity(intent)
+                return true
+            }
+        }
+        val genericIntent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(streamUri, "video/*")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        return if (genericIntent.resolveActivity(pm) != null) {
+            context.startActivity(genericIntent)
+            true
+        } else {
+            false
         }
     }
 }

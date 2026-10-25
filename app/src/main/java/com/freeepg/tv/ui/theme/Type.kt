@@ -1,74 +1,87 @@
 package com.freeepg.tv.ui.theme
 
+import com.freeepg.tv.R
 import androidx.compose.material3.Typography
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import com.freeepg.tv.R
-
-private val AtkinsonHyperlegible = FontFamily(
-    Font(R.font.atkinson_hyperlegible_regular, FontWeight.Normal),
-    Font(R.font.atkinson_hyperlegible_bold, FontWeight.Bold)
-)
 
 private val DefaultTypography = Typography()
-private fun TextStyle.withTvFont() = copy(fontFamily = AtkinsonHyperlegible)
+
+@OptIn(ExperimentalTextApi::class)
+private fun variableFont(resId: Int, weight: FontWeight) = FontFamily(
+    Font(
+        resId = resId,
+        weight = weight,
+        variationSettings = FontVariation.Settings(FontVariation.weight(weight.weight))
+    )
+)
+
+private fun TextStyle.withHeaderFont() = copy(
+    fontFamily = variableFont(R.font.jost_variable, fontWeight ?: FontWeight.Normal)
+)
+
+private fun TextStyle.withBodyFont() = copy(
+    fontFamily = variableFont(R.font.montserrat_variable, fontWeight ?: FontWeight.Normal)
+)
 
 val TvTypography = Typography(
-    displayLarge = DefaultTypography.displayLarge.withTvFont(),
-    displayMedium = DefaultTypography.displayMedium.withTvFont(),
-    displaySmall = DefaultTypography.displaySmall.withTvFont(),
+    displayLarge = DefaultTypography.displayLarge.withHeaderFont(),
+    displayMedium = DefaultTypography.displayMedium.withHeaderFont(),
+    displaySmall = DefaultTypography.displaySmall.withHeaderFont(),
     headlineLarge = TextStyle(
-        fontFamily = AtkinsonHyperlegible,
+        fontFamily = variableFont(R.font.jost_variable, FontWeight.Bold),
         fontWeight = FontWeight.Bold,
         fontSize = 28.sp,
         lineHeight = 34.sp,
         color = TextPrimary
     ),
     headlineMedium = TextStyle(
-        fontFamily = AtkinsonHyperlegible,
+        fontFamily = variableFont(R.font.jost_variable, FontWeight.Bold),
         fontWeight = FontWeight.Bold,
         fontSize = 22.sp,
         lineHeight = 28.sp,
         color = TextPrimary
     ),
-    headlineSmall = DefaultTypography.headlineSmall.withTvFont(),
+    headlineSmall = DefaultTypography.headlineSmall.withHeaderFont(),
     titleLarge = TextStyle(
-        fontFamily = AtkinsonHyperlegible,
+        fontFamily = variableFont(R.font.jost_variable, FontWeight.SemiBold),
         fontWeight = FontWeight.SemiBold,
         fontSize = 18.sp,
         lineHeight = 24.sp,
         color = TextPrimary
     ),
     titleMedium = TextStyle(
-        fontFamily = AtkinsonHyperlegible,
+        fontFamily = variableFont(R.font.jost_variable, FontWeight.Medium),
         fontWeight = FontWeight.Medium,
         fontSize = 15.sp,
         lineHeight = 20.sp,
         color = TextPrimary
     ),
-    titleSmall = DefaultTypography.titleSmall.withTvFont(),
+    titleSmall = DefaultTypography.titleSmall.withHeaderFont(),
     bodyLarge = TextStyle(
-        fontFamily = AtkinsonHyperlegible,
+        fontFamily = variableFont(R.font.montserrat_variable, FontWeight.Normal),
         fontWeight = FontWeight.Normal,
         fontSize = 14.sp,
         lineHeight = 20.sp,
         color = TextSecondary
     ),
     bodyMedium = TextStyle(
-        fontFamily = AtkinsonHyperlegible,
+        fontFamily = variableFont(R.font.montserrat_variable, FontWeight.Normal),
         fontWeight = FontWeight.Normal,
         fontSize = 12.sp,
         lineHeight = 16.sp,
         color = TextSecondary
     ),
-    bodySmall = DefaultTypography.bodySmall.withTvFont(),
-    labelLarge = DefaultTypography.labelLarge.withTvFont(),
-    labelMedium = DefaultTypography.labelMedium.withTvFont(),
+    bodySmall = DefaultTypography.bodySmall.withBodyFont(),
+    labelLarge = DefaultTypography.labelLarge.withBodyFont(),
+    labelMedium = DefaultTypography.labelMedium.withBodyFont(),
     labelSmall = TextStyle(
-        fontFamily = AtkinsonHyperlegible,
+        fontFamily = variableFont(R.font.montserrat_variable, FontWeight.Bold),
         fontWeight = FontWeight.Bold,
         fontSize = 11.sp,
         lineHeight = 14.sp,

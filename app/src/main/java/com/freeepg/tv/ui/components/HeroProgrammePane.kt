@@ -151,7 +151,7 @@ fun HeroProgrammePane(
                                 Spacer(modifier = Modifier.width(5.dp))
                                 Text(
                                     text = "LIVE NOW",
-                                    color = AccentLive,
+                                    color = Color.White,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 10.5.sp
                                 )

@@ -126,7 +126,7 @@
 
         <activity
             android:name=".ui.TunerPlayerActivity"
-            android:exported="false"
+            android:exported="true"
             android:screenOrientation="landscape"
             android:configChanges="orientation|keyboardHidden|screenSize|screenLayout"
             android:theme="@style/Theme.FreeEPG" />
