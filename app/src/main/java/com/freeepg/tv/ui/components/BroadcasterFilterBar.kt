@@ -35,10 +35,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.nativeKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
@@ -238,7 +238,7 @@ private fun FilterTab(
         modifier = Modifier
             .then(if (isDefaultFocus) Modifier.focusRequester(focusRequester) else Modifier)
             .onPreviewKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0 && event.key == Key.DirectionDown) {
+                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
                     onNavigateToGuide()
                     true
                 } else false
@@ -275,7 +275,7 @@ private fun TvActionButton(
         horizontalArrangement = Arrangement.Center,
         modifier = Modifier
             .onPreviewKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0 && event.key == Key.DirectionDown) {
+                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
                     onNavigateToGuide()
                     true
                 } else false

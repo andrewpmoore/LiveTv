@@ -134,7 +134,8 @@ fun MainEpgScreen(viewModel: EpgViewModel) {
                         coroutineScope.launch {
                             repeat(20) {
                                 try {
-                                    if (firstChannelFocusRequester.requestFocus()) return@launch
+                                    firstChannelFocusRequester.requestFocus()
+                                    return@launch
                                 } catch (_: IllegalStateException) {
                                 }
                                 kotlinx.coroutines.delay(50)

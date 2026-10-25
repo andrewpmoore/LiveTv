@@ -846,7 +846,6 @@ private fun AccessibilitySetupRow(
 }
 
 @Composable
-@Composable
 private fun HdHomeRunStatusRow(
     tunerName: String?,
     tunerIp: String?,
