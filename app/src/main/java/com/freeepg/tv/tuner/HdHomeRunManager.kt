@@ -17,6 +17,8 @@ import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import java.io.File
 import java.io.StringReader
+import java.net.Inet4Address
+import java.net.InetAddress
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -425,18 +427,58 @@ class HdHomeRunManager(private val context: Context) {
     }
 
     /**
-     * Discovers an HDHomeRun through SiliconDust's online device discovery endpoint.
+     * Finds an HDHomeRun locally first, then falls back to SiliconDust's online discovery service.
      */
     suspend fun discoverTuner(): HdHomeRunDiscoverDevice? = withContext(Dispatchers.IO) {
-        try {
+        val primary = discoverOnLocalNetwork() ?: discoverThroughCloud()
+        if (primary != null) {
+            prefs.edit()
+                .putString(KEY_TUNER_IP, primary.localIp)
+                .putString(KEY_TUNER_NAME, primary.friendlyName ?: primary.modelNumber ?: "HDHomeRun")
+                .putString(KEY_TUNER_DEVICE_ID, primary.deviceId)
+                .apply()
+            Log.i(TAG, "Discovered HDHomeRun: ${primary.friendlyName} at ${primary.localIp}")
+        }
+        primary
+    }
+
+    private fun discoverOnLocalNetwork(): HdHomeRunDiscoverDevice? {
+        val host = "hdhomerun.local"
+        return try {
+            val request = Request.Builder()
+                .url("http://$host/discover.json")
+                .header("Accept", "application/json")
+                .build()
+
+            httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return null
+                val body = response.body?.string() ?: return null
+                val device = json.decodeFromString<HdHomeRunDiscoverDevice>(body)
+                val ipAddress = device.localIp
+                    ?.takeIf { it.isNotBlank() }
+                    ?: resolveIpv4(host)
+                    ?: device.baseUrl?.let { baseUrl ->
+                        runCatching { resolveIpv4(baseUrl.toHttpUrl().host) }.getOrNull()
+                    }
+                if (ipAddress.isNullOrBlank()) return null
+                device.copy(localIp = ipAddress)
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "Local HDHomeRun discovery unavailable: ${e.message}")
+            null
+        }
+    }
+
+    private fun discoverThroughCloud(): HdHomeRunDiscoverDevice? {
+        return try {
             val request = Request.Builder()
                 .url(DISCOVER_URL)
                 .header("Accept", "application/json")
                 .build()
 
             httpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext null
-                val body = response.body?.string() ?: return@withContext null
+                if (!response.isSuccessful) return null
+                val body = response.body?.string() ?: return null
 
                 val devices = try {
                     json.decodeFromString<List<HdHomeRunDiscoverDevice>>(body)
@@ -448,22 +490,19 @@ class HdHomeRunManager(private val context: Context) {
                     }
                 }
 
-                val primary = devices.firstOrNull { !it.localIp.isNullOrBlank() }
-                if (primary != null) {
-                    prefs.edit()
-                        .putString(KEY_TUNER_IP, primary.localIp)
-                        .putString(KEY_TUNER_NAME, primary.friendlyName ?: primary.modelNumber ?: "HDHomeRun")
-                        .putString(KEY_TUNER_DEVICE_ID, primary.deviceId)
-                        .apply()
-                    Log.i(TAG, "Discovered HDHomeRun: ${primary.friendlyName} at ${primary.localIp}")
-                }
-                primary
+                devices.firstOrNull { !it.localIp.isNullOrBlank() }
             }
         } catch (e: Exception) {
             Log.w(TAG, "HDHomeRun discovery failed: ${e.message}")
             null
         }
     }
+
+    private fun resolveIpv4(host: String): String? = runCatching {
+        InetAddress.getAllByName(host)
+            .firstOrNull { it is Inet4Address }
+            ?.hostAddress
+    }.getOrNull()
 
     /**
      * Loads the channel lineup from the tuner or local cache / fallback.
