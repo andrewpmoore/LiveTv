@@ -88,15 +88,18 @@ jobs:
 
             Download the pre-compiled APK below to install on your Android TV or Google TV device.
 
-            #### Key Features:
-            - Complete 24-hour linear EPG for UK free-to-air channels (BBC, ITV, Channel 4 and Channel 5, plus HDHomeRun tuner channels).
-            - Real-time now/next guide and dynamic hero detail pane with broadcast metadata.
-            - Direct deep linking into live channel playback across broadcaster apps.
-            - HDHomeRun tuner discovery with native LibVLC playback for broadcast formats.
+            #### Features and improvements:
+            - Live UK listings for BBC, ITV, Channel 4 and Channel 5, plus HDHomeRun tuner channels.
+            - Local UDP tuner discovery with automatic address detection, hostname/cloud fallbacks, and rediscovery on startup.
+            - Reliable D-pad navigation from every broadcaster filter into the guide, including channels with no listings.
+            - Programme details and artwork without duplicate play controls; select a live programme in the guide to watch.
+            - Direct deep links into broadcaster apps and built-in LibVLC tuner playback, including MPEG-2 video.
             - Choose the built-in tuner player or an installed external player in Settings.
-            - Hide weak-signal tuner channels from the guide and restore them later.
-            - Channel guide defaults to grouping channels by provider.
-            - 10-foot TV UI optimized for D-pad remote controls.
+            - The weak-signal hide action receives focus automatically and supports remote OK and gamepad A. Restore hidden channels in Settings.
+            - Cleaner settings, updated launcher icons and TV banner, and refreshed screenshots showing live programmes and artwork.
+            - Provider, channel-number and alphabetical ordering; new installs default to provider order.
+
+            See the [README](https://github.com/andrewpmoore/LiveTv/tree/${{ steps.tag_info.outputs.tag }}#readme) for screenshots, installation, tuner setup and signing instructions.
           draft: false
           prerelease: false
         env:
