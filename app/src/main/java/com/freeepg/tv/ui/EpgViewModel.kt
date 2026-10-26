@@ -43,6 +43,9 @@ data class EpgUiState(
     val tunerChannels: List<Channel> = emptyList(),
     val tunerName: String? = null,
     val tunerIp: String? = null,
+    val tunerExternalPlayerPackage: String? = null,
+    val availableTunerPlayers: List<DeepLinkManager.ExternalTunerPlayer> = emptyList(),
+    val hiddenTunerChannels: List<Channel> = emptyList(),
     val isScanningTuner: Boolean = false
 ) {
     companion object {
@@ -68,6 +71,7 @@ class EpgViewModel(application: Application) : AndroidViewModel(application) {
             enabledBroadcasters = settingsRepository.getEnabledBroadcasters(),
             channelSortOrder = settingsRepository.getChannelSortOrder(),
             showAdultChannels = settingsRepository.isAdultChannelsEnabled(),
+            tunerExternalPlayerPackage = settingsRepository.getTunerExternalPlayerPackage(),
             channels = settingsRepository.getFilteredChannels(null)
         )
     )
@@ -104,6 +108,7 @@ class EpgViewModel(application: Application) : AndroidViewModel(application) {
                 it.copy(
                     channels = activeChannels,
                     tunerChannels = tunerChannels,
+                    hiddenTunerChannels = tunerChannels.filter { it.id in settingsRepository.getHiddenTunerChannelIds() },
                     tunerName = hdHomeRunManager.getStoredTunerName(),
                     tunerIp = hdHomeRunManager.getStoredTunerIp()
                 )
@@ -132,6 +137,7 @@ class EpgViewModel(application: Application) : AndroidViewModel(application) {
                     it.copy(
                         isScanningTuner = false,
                         tunerChannels = updatedTunerChannels,
+                        hiddenTunerChannels = updatedTunerChannels.filter { it.id in settingsRepository.getHiddenTunerChannelIds() },
                         channels = activeChannels,
                         tunerName = discovered.friendlyName ?: "HDHomeRun",
                         tunerIp = discovered.localIp
@@ -267,6 +273,45 @@ class EpgViewModel(application: Application) : AndroidViewModel(application) {
 
     fun openSettings() {
         refreshAccessibilityStatus(showDialog = true)
+        val sampleStreamUrl = tunerChannels.firstNotNullOfOrNull { it.streamUrl }
+            ?: "http://127.0.0.1:5004/auto/v1"
+        _uiState.update {
+            it.copy(availableTunerPlayers = deepLinkManager.getExternalTunerPlayers(sampleStreamUrl))
+        }
+    }
+
+    fun refreshTunerChannelVisibility() {
+        val hidden = settingsRepository.getHiddenTunerChannelIds()
+        val current = _uiState.value
+        val visible = settingsRepository.getFilteredChannels(
+            current.selectedBroadcaster,
+            current.channelSortOrder,
+            tunerChannels
+        )
+        val focused = current.focusedChannel?.takeIf { it in visible } ?: visible.firstOrNull()
+        val programme = focused?.let { channel ->
+            current.scheduleMap[channel.id]?.firstOrNull { it.isLiveNow(current.currentTimeSeconds) }
+                ?: current.scheduleMap[channel.id]?.firstOrNull()
+        }
+        _uiState.update {
+            it.copy(
+                channels = visible,
+                tunerExternalPlayerPackage = settingsRepository.getTunerExternalPlayerPackage(),
+                hiddenTunerChannels = tunerChannels.filter { channel -> channel.id in hidden },
+                focusedChannel = focused,
+                focusedProgramme = programme
+            )
+        }
+    }
+
+    fun restoreTunerChannel(channelId: String) {
+        settingsRepository.setTunerChannelHidden(channelId, false)
+        refreshTunerChannelVisibility()
+    }
+
+    fun selectTunerPlayer(packageName: String?) {
+        settingsRepository.setTunerExternalPlayerPackage(packageName)
+        _uiState.update { it.copy(tunerExternalPlayerPackage = packageName) }
     }
 
     fun refreshAccessibilityStatus(showDialog: Boolean? = null) {

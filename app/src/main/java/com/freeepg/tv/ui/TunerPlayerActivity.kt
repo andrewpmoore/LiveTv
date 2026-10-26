@@ -1,9 +1,9 @@
 package com.freeepg.tv.ui
 
-import android.content.Intent
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.os.Bundle
-import android.view.ViewGroup
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -49,22 +49,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.common.C
-import androidx.media3.common.MediaItem
-import androidx.media3.common.MimeTypes
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player
-import androidx.media3.common.Tracks
-import androidx.media3.common.util.TimestampAdjuster
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.extractor.ExtractorsFactory
-import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
-import androidx.media3.extractor.ts.TsExtractor
-import androidx.media3.extractor.ts.TsPayloadReader
-import androidx.media3.ui.PlayerView
-import com.freeepg.tv.deeplink.DeepLinkManager
+import com.freeepg.tv.data.repository.SettingsRepository
 import com.freeepg.tv.ui.theme.FreeEpgTheme
+import org.videolan.libvlc.LibVLC
+import org.videolan.libvlc.Media
+import org.videolan.libvlc.MediaPlayer
+import org.videolan.libvlc.util.VLCVideoLayout
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -72,6 +62,7 @@ import java.util.Locale
 class TunerPlayerActivity : ComponentActivity() {
     companion object {
         const val EXTRA_STREAM_URL = "tuner_stream_url"
+        const val EXTRA_CHANNEL_ID = "tuner_channel_id"
         const val EXTRA_CHANNEL_NAME = "tuner_channel_name"
         const val EXTRA_CHANNEL_NUMBER = "tuner_channel_number"
         const val EXTRA_PROGRAMME_TITLE = "tuner_programme_title"
@@ -93,6 +84,7 @@ class TunerPlayerActivity : ComponentActivity() {
             FreeEpgTheme {
                 TunerPlayerScreen(
                     streamUrl = streamUrl,
+                    channelId = intent.getStringExtra(EXTRA_CHANNEL_ID).orEmpty(),
                     channelName = intent.getStringExtra(EXTRA_CHANNEL_NAME).orEmpty(),
                     channelNumber = intent.getStringExtra(EXTRA_CHANNEL_NUMBER).orEmpty(),
                     programmeTitle = intent.getStringExtra(EXTRA_PROGRAMME_TITLE).orEmpty(),
@@ -109,6 +101,7 @@ class TunerPlayerActivity : ComponentActivity() {
 @Composable
 private fun TunerPlayerScreen(
     streamUrl: String,
+    channelId: String,
     channelName: String,
     channelNumber: String,
     programmeTitle: String,
@@ -119,136 +112,54 @@ private fun TunerPlayerScreen(
 ) {
     val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
-    val deepLinkManager = remember { DeepLinkManager(context) }
+    val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
     var playerError by remember { mutableStateOf<String?>(null) }
-    var hasCodecSupportError by remember { mutableStateOf(false) }
     var isBuffering by remember { mutableStateOf(true) }
+    var hasStartedPlayback by remember { mutableStateOf(false) }
     var bufferingTimedOut by remember { mutableStateOf(false) }
+    var weakSignalDetected by remember { mutableStateOf(false) }
     var showDetails by remember { mutableStateOf(true) }
     var interaction by remember { mutableIntStateOf(0) }
     var nowSeconds by remember { mutableStateOf(System.currentTimeMillis() / 1000L) }
 
-    val externalPlayer = remember {
-        val pm = context.packageManager
-        val players = listOf(
-            "org.videolan.vlc" to "VLC",
-            "com.silicondust.view" to "HDHomeRun View",
-            "com.brouken.player" to "Just Player",
-            "org.courville.nova" to "Nova Video Player"
-        )
-        players.firstOrNull { (pkg, _) ->
-            try {
-                pm.getPackageInfo(pkg, 0)
-                true
-            } catch (_: Exception) {
-                false
-            }
-        }
+    val libVlc = remember(streamUrl) {
+        LibVLC(context.applicationContext, arrayListOf("--network-caching=1200", "--clock-jitter=0"))
     }
-
-    fun launchExternal() {
-        if (deepLinkManager.launchExternalTunerStream(streamUrl)) {
-            onBack()
-        } else {
-            deepLinkManager.openPlayStore("org.videolan.vlc")
-        }
-    }
-
-    val player = remember(streamUrl) {
-        val extractorsFactory = ExtractorsFactory {
-            val defaultFactory = DefaultTsPayloadReaderFactory(
-                DefaultTsPayloadReaderFactory.FLAG_IGNORE_SPLICE_INFO_STREAM
-            )
-            var seenAudio = false
-            val tsPayloadReaderFactory = object : TsPayloadReader.Factory {
-                override fun createInitialPayloadReaders(): android.util.SparseArray<TsPayloadReader> {
-                    return defaultFactory.createInitialPayloadReaders()
-                }
-
-                override fun createPayloadReader(
-                    streamType: Int,
-                    esInfo: TsPayloadReader.EsInfo
-                ): TsPayloadReader? {
-                    // Ignore DVB subtitles, teletext, and private data streams that cause
-                    // ProgressiveMediaPeriod to wait indefinitely for format headers
-                    if (streamType == 89 || streamType == 6 || streamType == 5 || streamType == 11) {
-                        return null
-                    }
-                    // Only register the primary audio stream. Secondary/Audio Description
-                    // tracks rarely transmit samples and cause perpetual buffering.
-                    if (streamType == 3 || streamType == 4 || streamType == 15 || streamType == 17 || streamType == 129 || streamType == 135) {
-                        if (seenAudio) return null
-                        seenAudio = true
-                    }
-                    return defaultFactory.createPayloadReader(streamType, esInfo)
-                }
-            }
-            @Suppress("DEPRECATION")
-            arrayOf(
-                TsExtractor(
-                    TsExtractor.MODE_SINGLE_PMT,
-                    TimestampAdjuster(0),
-                    tsPayloadReaderFactory
-                )
-            )
-        }
-        val mediaSourceFactory = DefaultMediaSourceFactory(context, extractorsFactory)
-
-        ExoPlayer.Builder(context)
-            .setMediaSourceFactory(mediaSourceFactory)
-            .build().apply {
-                setMediaItem(
-                    MediaItem.Builder()
-                        .setUri(streamUrl)
-                        .setMimeType(MimeTypes.VIDEO_MP2T)
-                        .build()
-                )
-                playWhenReady = true
-                addListener(object : Player.Listener {
-                    override fun onPlaybackStateChanged(playbackState: Int) {
-                        isBuffering = playbackState == Player.STATE_BUFFERING || playbackState == Player.STATE_IDLE
-                        if (playbackState == Player.STATE_READY) {
-                            bufferingTimedOut = false
+    val player = remember(libVlc) {
+        MediaPlayer(libVlc).apply {
+            setEventListener { event ->
+                mainHandler.post {
+                    when (event.type) {
+                        MediaPlayer.Event.Opening, MediaPlayer.Event.Buffering -> {
+                            if (!hasStartedPlayback) isBuffering = true
                         }
-                    }
-
-                    override fun onTracksChanged(tracks: Tracks) {
-                        val videoGroup = tracks.groups.firstOrNull { it.type == C.TRACK_TYPE_VIDEO }
-                        val audioGroup = tracks.groups.firstOrNull { it.type == C.TRACK_TYPE_AUDIO }
-                        val hasVideo = videoGroup != null
-                        val hasAudio = audioGroup != null
-                        val isVideoSupported = videoGroup?.let { g -> (0 until g.length).any(g::isTrackSupported) } ?: false
-                        val isAudioSupported = audioGroup?.let { g -> (0 until g.length).any(g::isTrackSupported) } ?: false
-
-                        if ((hasVideo && !isVideoSupported) || (hasAudio && !isAudioSupported)) {
-                            hasCodecSupportError = true
-                            playerError = "This TV lacks an MPEG-2/MP2 broadcast decoder. Use an external player (e.g. VLC) to play."
+                        MediaPlayer.Event.Playing, MediaPlayer.Event.Vout -> {
+                            hasStartedPlayback = true
                             isBuffering = false
+                            bufferingTimedOut = false
+                            playerError = null
+                        }
+                        MediaPlayer.Event.EncounteredError -> {
+                            playerError = "Unable to play this tuner stream. Check the antenna signal, or try an external player."
+                            isBuffering = false
+                            weakSignalDetected = true
                             showDetails = true
                         }
                     }
-
-                    override fun onPlayerError(error: PlaybackException) {
-                        val cause = error.cause?.message ?: error.message ?: ""
-                        playerError = when {
-                            cause.contains("404") ->
-                                "Channel unavailable or weak antenna signal on HDHomeRun (Error 404)."
-                            cause.contains("Decoder") || cause.contains("MediaCodec") ->
-                                "This TV does not support MPEG-2/MP2 broadcast decoding."
-                            else ->
-                                "Tuner playback error: ${error.localizedMessage ?: "Unable to stream"}"
-                        }
-                        isBuffering = false
-                        showDetails = true
-                    }
-                })
-                prepare()
+                }
             }
+        }
     }
 
     DisposableEffect(player) {
-        onDispose { player.release() }
+        onDispose {
+            player.stop()
+            player.detachViews()
+            player.setEventListener(null)
+            player.release()
+            libVlc.release()
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -256,11 +167,12 @@ private fun TunerPlayerScreen(
     }
 
     // Buffering timeout watcher: If tuning takes over 7s, antenna signal is likely missing
-    LaunchedEffect(isBuffering, playerError) {
-        if (isBuffering && playerError == null) {
+    LaunchedEffect(isBuffering, hasStartedPlayback, playerError) {
+        if (isBuffering && !hasStartedPlayback && playerError == null) {
             kotlinx.coroutines.delay(7_000)
-            if (isBuffering && playerError == null) {
+            if (isBuffering && !hasStartedPlayback && playerError == null) {
                 bufferingTimedOut = true
+                weakSignalDetected = true
                 showDetails = true
             }
         } else {
@@ -291,14 +203,9 @@ private fun TunerPlayerScreen(
                 if (event.type == KeyEventType.KeyDown) {
                     when (event.key) {
                         Key.DirectionCenter, Key.Enter -> {
-                            if (playerError != null || hasCodecSupportError || bufferingTimedOut) {
-                                launchExternal()
-                                true
-                            } else {
-                                showDetails = true
-                                interaction++
-                                true
-                            }
+                            showDetails = true
+                            interaction++
+                            true
                         }
                         Key.Back, Key.Escape -> {
                             onBack()
@@ -313,20 +220,19 @@ private fun TunerPlayerScreen(
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { viewContext ->
-                PlayerView(viewContext).apply {
-                    useController = false
-                    layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                    this.player = player
+                VLCVideoLayout(viewContext).also { layout ->
+                    player.attachViews(layout, null, true, false)
+                    val media = Media(libVlc, Uri.parse(streamUrl))
+                    player.setMedia(media)
+                    media.release()
+                    player.play()
                 }
             },
-            update = { it.player = player }
+            update = {}
         )
 
         // Center connecting / buffering notice
-        if (isBuffering && playerError == null) {
+        if (isBuffering && !hasStartedPlayback && playerError == null) {
             Column(
                 modifier = Modifier.align(Alignment.Center),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -340,7 +246,7 @@ private fun TunerPlayerScreen(
                 if (bufferingTimedOut) {
                     Spacer(Modifier.height(10.dp))
                     Text(
-                        text = "Antenna signal may be weak or missing. Press [OK] to open in external player.",
+                        text = "Antenna signal may be weak or missing. Press Back to return to the guide.",
                         color = Color(0xFFFFCC80),
                         fontSize = 15.sp
                     )
@@ -416,40 +322,26 @@ private fun TunerPlayerScreen(
                 }
 
                 // Error or external player call-to-action
-                if (playerError != null || hasCodecSupportError || bufferingTimedOut) {
+                if (playerError != null || bufferingTimedOut) {
                     Spacer(Modifier.height(12.dp))
                     playerError?.let {
                         Text(it, color = Color(0xFFFF8A80), fontSize = 15.sp, fontWeight = FontWeight.Medium)
                         Spacer(Modifier.height(10.dp))
                     }
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        val playerActionLabel = externalPlayer?.let { "Play in ${it.second}" } ?: "Install VLC Player"
+                    if (weakSignalDetected && channelId.isNotBlank()) {
+                        Spacer(Modifier.height(10.dp))
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFF00B0FF),
+                            color = Color(0xFF8B2635),
                             modifier = Modifier
-                                .clickable { launchExternal() }
-                                .border(1.5.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(8.dp))
+                                .clickable {
+                                    SettingsRepository(context).setTunerChannelHidden(channelId, true)
+                                    onBack()
+                                }
+                                .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
                         ) {
                             Text(
-                                text = "▶  $playerActionLabel",
-                                color = Color.Black,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp)
-                            )
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = Color.White.copy(alpha = 0.16f),
-                            modifier = Modifier
-                                .clickable { onBack() }
-                                .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                        ) {
-                            Text(
-                                text = "Back to Guide",
+                                text = "Hide this channel from the guide",
                                 color = Color.White,
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Medium,
@@ -461,6 +353,7 @@ private fun TunerPlayerScreen(
             }
         }
     }
+
 }
 
 private fun formatClock(epochSeconds: Long): String =

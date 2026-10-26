@@ -92,7 +92,9 @@ jobs:
             - Complete 24-hour linear EPG for UK free-to-air channels (BBC, ITV, Channel 4, Channel 5, U/UKTV).
             - Real-time now/next guide and dynamic hero detail pane with broadcast metadata.
             - Direct deep linking into live channel playback across broadcaster apps.
-            - Optional HDHomeRun tuner discovery and live stream playback.
+            - HDHomeRun tuner discovery with native LibVLC playback for broadcast formats.
+            - Choose the built-in tuner player or an installed external player in Settings.
+            - Hide weak-signal tuner channels from the guide and restore them later.
             - 10-foot TV UI optimized for D-pad remote controls.
           draft: false
           prerelease: false

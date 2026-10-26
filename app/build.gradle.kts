@@ -13,8 +13,8 @@ android {
         applicationId = "com.freeepg.tv"
         minSdk = 26
         targetSdk = 35
-        versionCode = 6
-        versionName = "1.0.5"
+        versionCode = 7
+        versionName = "1.0.6"
 
         vectorDrawables {
             useSupportLibrary = true
@@ -111,8 +111,8 @@ dependencies {
 
     // Leanback Support
     implementation("androidx.leanback:leanback:1.0.0")
-    implementation("androidx.media3:media3-exoplayer:1.4.1")
-    implementation("androidx.media3:media3-ui:1.4.1")
+    // Bundles VLC's native codecs, including software decoding for MPEG-2 broadcast video.
+    implementation("org.videolan.android:libvlc-all:3.6.5")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

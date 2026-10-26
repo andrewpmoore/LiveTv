@@ -53,6 +53,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.freeepg.tv.data.model.Broadcaster
 import com.freeepg.tv.data.model.Channel
 import com.freeepg.tv.data.repository.ChannelSortOrder
+import com.freeepg.tv.deeplink.DeepLinkManager
 import com.freeepg.tv.ui.theme.AccentCyan
 import com.freeepg.tv.ui.theme.AccentLive
 import com.freeepg.tv.ui.theme.BorderFocused
@@ -69,6 +70,9 @@ fun SettingsDialog(
     isMacroEnabled: Boolean,
     isAccessibilityServiceActive: Boolean,
     tunerChannelsCount: Int = 0,
+    hiddenTunerChannels: List<Channel> = emptyList(),
+    tunerExternalPlayerPackage: String? = null,
+    availableTunerPlayers: List<DeepLinkManager.ExternalTunerPlayer> = emptyList(),
     tunerName: String? = null,
     tunerIp: String? = null,
     isScanningTuner: Boolean = false,
@@ -78,6 +82,8 @@ fun SettingsDialog(
     onToggleMacro: () -> Unit,
     onOpenAccessibilitySettings: () -> Unit,
     onScanTuner: () -> Unit = {},
+    onRestoreTunerChannel: (String) -> Unit = {},
+    onSelectTunerPlayer: (String?) -> Unit = {},
     onDismiss: () -> Unit
 ) {
     BackHandler { onDismiss() }
@@ -291,6 +297,58 @@ fun SettingsDialog(
                                 isEnabled = showAdultChannels,
                                 onToggle = onToggleAdultChannels
                             )
+                        }
+
+                        item {
+                            Text(
+                                text = "TUNER PLAYBACK",
+                                color = Color(0xFF00B0FF),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.8.sp,
+                                modifier = Modifier.padding(start = 4.dp, top = 6.dp, bottom = 4.dp)
+                            )
+                        }
+                        item {
+                            TunerPlaybackOptionRow(
+                                label = "Built-in player (LibVLC)",
+                                isSelected = tunerExternalPlayerPackage == null,
+                                onSelect = { onSelectTunerPlayer(null) }
+                            )
+                        }
+                        items(availableTunerPlayers, key = { it.packageName }) { player ->
+                            TunerPlaybackOptionRow(
+                                label = player.label,
+                                isSelected = tunerExternalPlayerPackage == player.packageName,
+                                onSelect = { onSelectTunerPlayer(player.packageName) }
+                            )
+                        }
+
+                        if (availableTunerPlayers.isEmpty()) {
+                            item {
+                                Text(
+                                    text = "No compatible external players found",
+                                    color = TextTertiary,
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)
+                                )
+                            }
+                        }
+
+                        if (hiddenTunerChannels.isNotEmpty()) {
+                            item {
+                                Text(
+                                    text = "HIDDEN TUNER CHANNELS",
+                                    color = Color(0xFF00B0FF),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.8.sp,
+                                    modifier = Modifier.padding(start = 4.dp, top = 6.dp, bottom = 4.dp)
+                                )
+                            }
+                            items(hiddenTunerChannels, key = { it.id }) { channel ->
+                                HiddenTunerChannelRow(channel, onRestore = { onRestoreTunerChannel(channel.id) })
+                            }
                         }
 
                         // Section 2 Header: Auto-Stream Launcher Macro
@@ -964,6 +1022,69 @@ private fun HdHomeRunStatusRow(
                 color = Color(0xFF00B0FF),
                 fontWeight = FontWeight.Bold,
                 fontSize = 11.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun HiddenTunerChannelRow(channel: Channel, onRestore: () -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused = interactionSource.collectIsFocusedAsState().value
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (isFocused) Color(0xFF1E283C) else Color(0xFF111726))
+            .border(1.dp, if (isFocused) BorderFocused else Color(0x1FFFFFFF), RoundedCornerShape(10.dp))
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onRestore)
+            .focusable(interactionSource = interactionSource)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "${channel.channelNumber}  ${channel.name}",
+            color = TextPrimary,
+            fontSize = 12.sp,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = "Restore",
+            color = AccentCyan,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+private fun TunerPlaybackOptionRow(label: String, isSelected: Boolean, onSelect: () -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused = interactionSource.collectIsFocusedAsState().value
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (isFocused) Color(0xFF1E283C) else Color(0xFF111726))
+            .border(1.dp, if (isFocused) BorderFocused else Color(0x1FFFFFFF), RoundedCornerShape(10.dp))
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onSelect)
+            .focusable(interactionSource = interactionSource)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            color = if (isSelected) TextPrimary else TextSecondary,
+            fontSize = 12.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+            modifier = Modifier.weight(1f)
+        )
+        if (isSelected) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = "Selected",
+                tint = AccentCyan,
+                modifier = Modifier.size(18.dp)
             )
         }
     }

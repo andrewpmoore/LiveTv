@@ -50,6 +50,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         viewModel.refreshAccessibilityStatus()
+        viewModel.refreshTunerChannelVisibility()
     }
 }
 
@@ -209,6 +210,9 @@ fun MainEpgScreen(viewModel: EpgViewModel) {
             isMacroEnabled = state.isMacroEnabled,
             isAccessibilityServiceActive = state.isAccessibilityServiceActive,
             tunerChannelsCount = state.tunerChannels.size,
+            hiddenTunerChannels = state.hiddenTunerChannels,
+            tunerExternalPlayerPackage = state.tunerExternalPlayerPackage,
+            availableTunerPlayers = state.availableTunerPlayers,
             tunerName = state.tunerName,
             tunerIp = state.tunerIp,
             isScanningTuner = state.isScanningTuner,
@@ -229,6 +233,12 @@ fun MainEpgScreen(viewModel: EpgViewModel) {
             },
             onScanTuner = {
                 viewModel.scanForTuner(silent = false)
+            },
+            onRestoreTunerChannel = { channelId ->
+                viewModel.restoreTunerChannel(channelId)
+            },
+            onSelectTunerPlayer = { packageName ->
+                viewModel.selectTunerPlayer(packageName)
             },
             onDismiss = {
                 viewModel.closeSettings()

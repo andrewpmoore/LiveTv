@@ -9,6 +9,7 @@ import android.util.Log
 import com.freeepg.tv.data.model.Broadcaster
 import com.freeepg.tv.data.model.Channel
 import com.freeepg.tv.data.model.Programme
+import com.freeepg.tv.data.repository.SettingsRepository
 
 sealed class LaunchResult {
     data class Success(val destination: String, val method: String) : LaunchResult()
@@ -22,6 +23,12 @@ sealed class LaunchResult {
     data class Failure(val reason: String) : LaunchResult()
 }
 class DeepLinkManager(private val context: Context) {
+
+    data class ExternalTunerPlayer(
+        val packageName: String,
+        val label: String,
+        val activityName: String
+    )
 
     companion object {
         private const val TAG = "DeepLinkManager"
@@ -51,21 +58,21 @@ class DeepLinkManager(private val context: Context) {
      * accessibility macro navigate its live-channel menus.
      */
     fun launchLiveProgramme(channel: Channel, programme: Programme): LaunchResult {
-        // A tuner lineup row represents the broadcast stream the user selected.
-        // If an official broadcaster app (BBC iPlayer, ITVX, etc.) is installed on the device,
-        // prioritize it for overlapping channels per user preference (avoiding weak tuner antenna signal).
-        // Otherwise, open the tuner stream.
+        // The user's tuner playback choice is explicit: use the selected external app when
+        // configured, otherwise keep playback inside the built-in LibVLC player.
         if (channel.broadcaster == Broadcaster.TUNER || channel.streamUrl != null) {
-            val appChannel = channel.overlappingAppChannelId?.let { appChannelId ->
-                Channel.ALL_CHANNELS.firstOrNull { it.id == appChannelId }
+            val preferredTunerPlayer = SettingsRepository(context).getTunerExternalPlayerPackage()
+            val tunerStreamUrl = channel.streamUrl
+            if (preferredTunerPlayer != null && !tunerStreamUrl.isNullOrBlank() &&
+                launchExternalTunerStream(tunerStreamUrl, preferredTunerPlayer)
+            ) {
+                return LaunchResult.Success(
+                    destination = channel.shortName,
+                    method = "Remembered external tuner player: $preferredTunerPlayer"
+                )
             }
-            if (appChannel != null && findInstalledPackage(appChannel.broadcaster) != null) {
-                return launchLiveProgramme(appChannel, programme)
-            }
-
-            val streamUrl = channel.streamUrl
-            if (!streamUrl.isNullOrBlank()) {
-                return launchTunerStream(streamUrl, channel, programme)
+            if (!tunerStreamUrl.isNullOrBlank()) {
+                return launchTunerStream(tunerStreamUrl, channel, programme)
             }
             return LaunchResult.Failure("No tuner stream is available for ${channel.shortName}")
         }
@@ -284,6 +291,7 @@ class DeepLinkManager(private val context: Context) {
         return try {
             val intent = Intent(context, com.freeepg.tv.ui.TunerPlayerActivity::class.java).apply {
                 putExtra(com.freeepg.tv.ui.TunerPlayerActivity.EXTRA_STREAM_URL, streamUrl)
+                putExtra(com.freeepg.tv.ui.TunerPlayerActivity.EXTRA_CHANNEL_ID, channel.id)
                 putExtra(com.freeepg.tv.ui.TunerPlayerActivity.EXTRA_CHANNEL_NAME, channel.shortName)
                 putExtra(com.freeepg.tv.ui.TunerPlayerActivity.EXTRA_CHANNEL_NUMBER, channel.channelNumber)
                 putExtra(com.freeepg.tv.ui.TunerPlayerActivity.EXTRA_PROGRAMME_TITLE, programme.title)
@@ -306,28 +314,63 @@ class DeepLinkManager(private val context: Context) {
     /**
      * Plays an HDHomeRun live broadcast stream in an external media player (VLC, HDHomeRun View, Just Player, Nova).
      */
-    fun launchExternalTunerStream(streamUrl: String): Boolean {
+    fun getExternalTunerPlayers(streamUrl: String): List<ExternalTunerPlayer> {
         val streamUri = Uri.parse(streamUrl)
+        val candidates = listOf("video/*", "video/mp2t", null).map { mimeType ->
+            Intent(Intent.ACTION_VIEW).apply {
+                if (mimeType == null) data = streamUri else setDataAndType(streamUri, mimeType)
+            }
+        }
         val pm = context.packageManager
-        for (pkg in Broadcaster.TUNER.allPackages) {
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(streamUri, "video/*")
-                setPackage(pkg)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return candidates
+            .flatMap { intent -> pm.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY) }
+            .distinctBy { it.activityInfo?.packageName }
+            .mapNotNull { info ->
+                val activity = info.activityInfo ?: return@mapNotNull null
+                ExternalTunerPlayer(
+                    packageName = activity.packageName,
+                    label = info.loadLabel(pm)?.toString()?.takeIf(String::isNotBlank) ?: activity.packageName,
+                    activityName = activity.name
+                )
             }
-            if (intent.resolveActivity(pm) != null) {
-                context.startActivity(intent)
-                return true
+            .sortedBy { it.label.lowercase() }
+    }
+
+    fun rememberExternalTunerPlayer(packageName: String) {
+        SettingsRepository(context).setTunerExternalPlayerPackage(packageName)
+    }
+
+    fun launchExternalTunerStream(streamUrl: String, packageName: String? = null): Boolean {
+        val streamUri = Uri.parse(streamUrl)
+        val playerPackage = packageName ?: SettingsRepository(context).getTunerExternalPlayerPackage()
+        val candidates = listOf("video/*", "video/mp2t", null).map { mimeType ->
+            Intent(Intent.ACTION_VIEW).apply {
+                if (mimeType == null) data = streamUri else setDataAndType(streamUri, mimeType)
             }
         }
-        val genericIntent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(streamUri, "video/*")
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        return if (genericIntent.resolveActivity(pm) != null) {
-            context.startActivity(genericIntent)
+        val pm = context.packageManager
+        // Try common video MIME types and then the raw network URL. Some TV players register
+        // only one of these forms, and many tuner URLs have no file extension to identify them.
+        val compatibleIntent = candidates.firstOrNull { intent ->
+            val handlers = pm.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+            if (playerPackage == null) handlers.isNotEmpty()
+            else handlers.any { it.activityInfo?.packageName == playerPackage }
+        } ?: return false
+
+        return try {
+            if (playerPackage != null) {
+                compatibleIntent.setPackage(playerPackage)
+                compatibleIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(compatibleIntent)
+            } else {
+                // Let Android find every installed compatible player (including apps such as
+                // TVMosaic) instead of relying on a fixed package allowlist.
+                context.startActivity(Intent.createChooser(compatibleIntent, "Play tuner stream").apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                })
+            }
             true
-        } else {
+        } catch (_: Exception) {
             false
         }
     }

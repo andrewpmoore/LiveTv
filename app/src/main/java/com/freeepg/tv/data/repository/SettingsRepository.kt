@@ -23,6 +23,8 @@ class SettingsRepository(context: Context) {
         private const val KEY_CHANNEL_SORT_ORDER = "channel_sort_order"
         private const val KEY_TUNER_CONFIGURED = "tuner_configured_v1"
         private const val KEY_SHOW_ADULT_CHANNELS = "show_adult_tuner_channels"
+        private const val KEY_HIDDEN_TUNER_CHANNELS = "hidden_tuner_channels"
+        private const val KEY_TUNER_PLAYER_PACKAGE = "tuner_external_player_package"
 
         // All broadcasters enabled by default
         val DEFAULT_BROADCASTERS: Set<Broadcaster> = Broadcaster.values().toSet()
@@ -35,13 +37,15 @@ class SettingsRepository(context: Context) {
             enabledBroadcasters: Set<Broadcaster>,
             sortOrder: ChannelSortOrder,
             tunerChannels: List<Channel> = emptyList(),
-            showAdultChannels: Boolean = DEFAULT_SHOW_ADULT_CHANNELS
+            showAdultChannels: Boolean = DEFAULT_SHOW_ADULT_CHANNELS,
+            hiddenTunerChannelIds: Set<String> = emptySet()
         ): List<Channel> {
             val allEnabledAppChannels = allAppChannels.filter { it.broadcaster in enabledBroadcasters }
+            val unhiddenTunerChannels = tunerChannels.filterNot { it.id in hiddenTunerChannelIds }
             val visibleTunerChannels = if (showAdultChannels) {
-                tunerChannels
+                unhiddenTunerChannels
             } else {
-                tunerChannels.filterNot(::isAdultTunerChannel)
+                unhiddenTunerChannels.filterNot(::isAdultTunerChannel)
             }
 
             val filtered = when {
@@ -83,6 +87,7 @@ class SettingsRepository(context: Context) {
 
         private fun isAdultTunerChannel(channel: Channel): Boolean =
             channel.isTunerChannel && channel.channelNumber.toIntOrNull()?.let { it in 670..699 } == true
+
     }
 
     fun getEnabledBroadcasters(): Set<Broadcaster> {
@@ -153,6 +158,22 @@ class SettingsRepository(context: Context) {
         prefs.edit().putBoolean(KEY_SHOW_ADULT_CHANNELS, enabled).apply()
     }
 
+    fun getHiddenTunerChannelIds(): Set<String> =
+        prefs.getStringSet(KEY_HIDDEN_TUNER_CHANNELS, emptySet())?.toSet() ?: emptySet()
+
+    fun setTunerChannelHidden(channelId: String, hidden: Boolean) {
+        val ids = getHiddenTunerChannelIds().toMutableSet()
+        if (hidden) ids.add(channelId) else ids.remove(channelId)
+        prefs.edit().putStringSet(KEY_HIDDEN_TUNER_CHANNELS, ids).apply()
+    }
+
+    fun getTunerExternalPlayerPackage(): String? =
+        prefs.getString(KEY_TUNER_PLAYER_PACKAGE, null)
+
+    fun setTunerExternalPlayerPackage(packageName: String?) {
+        prefs.edit().putString(KEY_TUNER_PLAYER_PACKAGE, packageName).apply()
+    }
+
     fun getFilteredChannels(
         selectedBroadcaster: Broadcaster?,
         sortOrder: ChannelSortOrder = getChannelSortOrder(),
@@ -164,7 +185,8 @@ class SettingsRepository(context: Context) {
             enabledBroadcasters = getEnabledBroadcasters(),
             sortOrder = sortOrder,
             tunerChannels = tunerChannels,
-            showAdultChannels = isAdultChannelsEnabled()
+            showAdultChannels = isAdultChannelsEnabled(),
+            hiddenTunerChannelIds = getHiddenTunerChannelIds()
         )
     }
 
