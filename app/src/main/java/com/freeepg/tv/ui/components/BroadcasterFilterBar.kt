@@ -4,7 +4,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.ui.res.painterResource
@@ -82,14 +81,13 @@ fun BroadcasterFilterBar(
             .padding(horizontal = 24.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // App Icon / Logo in the top-left
+        // Borderless logo on the EPG's own background.
         Image(
             painter = painterResource(id = R.drawable.app_logo),
             contentDescription = "Live TV",
             modifier = Modifier
                 .padding(end = 20.dp)
-                .height(28.dp)
-                .width(37.dp)
+                .size(28.dp)
         )
 
         // Broadcaster Filter Tabs
@@ -244,7 +242,6 @@ private fun FilterTab(
                 } else false
             }
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
-            .focusable(interactionSource = interactionSource)
             .then(backgroundModifier)
             .then(borderModifier)
             .padding(horizontal = 14.dp, vertical = 6.dp),
@@ -281,7 +278,6 @@ private fun TvActionButton(
                 } else false
             }
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
-            .focusable(interactionSource = interactionSource)
             .background(
                 if (isFocused) AccentCyan.copy(alpha = 0.25f) else Color(0xFF131A28),
                 RoundedCornerShape(8.dp)

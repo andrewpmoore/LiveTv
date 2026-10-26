@@ -89,7 +89,7 @@ jobs:
             Download the pre-compiled APK below to install on your Android TV or Google TV device.
 
             #### Key Features:
-            - Complete 24-hour linear EPG for UK free-to-air channels (BBC, ITV, Channel 4, Channel 5, U/UKTV).
+            - Complete 24-hour linear EPG for UK free-to-air channels (BBC, ITV, Channel 4 and Channel 5, plus HDHomeRun tuner channels).
             - Real-time now/next guide and dynamic hero detail pane with broadcast metadata.
             - Direct deep linking into live channel playback across broadcaster apps.
             - HDHomeRun tuner discovery with native LibVLC playback for broadcast formats.

@@ -383,27 +383,6 @@ fun SettingsDialog(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Footer Info
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "Preferences persist automatically across app launches.",
-                            color = TextTertiary,
-                            fontSize = 11.sp
-                        )
-
-                        Text(
-                            text = "Press [OK] to toggle",
-                            color = AccentCyan.copy(alpha = 0.8f),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
                 }
             }
         }

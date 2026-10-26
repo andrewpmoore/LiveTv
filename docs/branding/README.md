@@ -1,0 +1,22 @@
+# Live TV branding
+
+- `launcher-icon.png`: approved square icon concept, with a white rounded play mark and pink live dot over a dark navy-to-pink gradient.
+- `launcher-banner.png`: wide TV launcher artwork with the same symbol and the **Live TV** wordmark. Density-specific exports live in `app/src/main/res/drawable-*/banner.png`.
+- The EPG uses `app/src/main/res/drawable/app_logo.xml`, a transparent vector implementation of the symbol, framed for a 28dp square.
+- Adaptive launchers use `ic_launcher_foreground.xml` over `launcher_gradient.png`. The vector foreground keeps the symbol sharp and inside the icon's safe area. Older bitmap icon resources use resized copies of the approved square artwork.
+
+Artwork was created with the built-in imagegen tool. The background-removal draft was discarded; the production foreground uses clean native Android vector paths.
+
+## Final image prompts
+
+### Square icon
+
+Create a refined square app icon concept based specifically on the standalone symbol at the bottom left of the supplied reference board. Output one square icon only, filling the whole image edge to edge, no presentation board, no text, no labels, no wordmark, no surrounding margins or devices. Preserve the very simple flat white right-facing play triangle with rounded corners and the separate vivid hot pink circular live dot floating above its upper-right shoulder. No television-shaped border, no enclosing symbol outline. Scale the combined symbol to around 52% of canvas width with balanced generous app-icon padding and visually centre it as a group. Keep the white triangle crisp solid white and the circular dot crisp vivid #FF176A; no shading or texture on these two shapes. Change the background to a slightly more vibrant but still dark smooth colour gradient: deep midnight navy #08142E across left and lower-left, subtle richer dark blue #14254D toward centre, merging through deep plum #351B42 into a restrained dark pink-magenta glow #6B204C near the upper-right, echoing the pink live dot. Background remains predominantly dark navy with subtle saturated colour and excellent contrast; soft sophisticated atmospheric gradient, no visible bands, no grain, no light streaks, no extra shapes, no neon outlines, no 3D, no drop shadows, no TV frame. Full bleed square artwork, no rounded-corner mask baked in.
+
+### Wide launcher banner
+
+Final Android TV wide launcher banner, landscape exact 16:9 aspect ratio. Production artwork, not a presentation board. Reference 1: use specifically the bottom-right horizontal logo concept — freestanding white rounded play triangle with separate hot pink dot at upper right, followed by the exact bold white wordmark 'Live TV'. Reference 2: match its dark midnight navy through blue/plum to subtle pink-magenta upper-right gradient background, and the same symbol styling. Create one finished wide banner with the single horizontal symbol-plus-wordmark lockup centred horizontally and vertically on that dark blue-to-pink full bleed gradient. Lockup occupies about 70% of canvas width, ample breathing room. Typography: match the compact bold contemporary sans serif wordmark in bottom-right reference 1, exact title case 'Live TV' with a clear small space, no extra letters. Text large, crisp and readable at 320x180px. Symbol height aligned with cap height plus floating live dot above its upper-right shoulder. Flat pure white play and text, vivid #FF176A round dot. No TV border or outline, no badge, no device, no presentation captions, no dividers, no secondary versions, no shadows, no 3D, no texture, no watermarks. Only one centred 'play mark + Live TV' on the dark gradient, edge-to-edge 16:9 rectangle, no rounded corner mask.
+
+### Adaptive background plate
+
+Remove only the white play triangle and the hot pink circular dot from the approved square icon, seamlessly filling their former locations with the underlying dark navy-to-purple gradient. Output the background only, exactly the same square dark gradient field edge-to-edge. Preserve the original backdrop colours, pink-magenta glow in the upper-right corner, midnight navy lower-left, soft blue through centre, original composition and lighting. A smooth clean empty gradient background plate for Android adaptive icon layers. No symbol, no logo, no white shapes, no dot, no text, no texture, no noise, no extra elements. Keep the background dark and match the reference colour distribution precisely.

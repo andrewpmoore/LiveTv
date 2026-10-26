@@ -15,8 +15,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -60,6 +62,7 @@ fun MainEpgScreen(viewModel: EpgViewModel) {
     val horizontalScrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
     val firstChannelFocusRequester = remember { FocusRequester() }
+    var guideFocusRequestId by remember { mutableIntStateOf(0) }
 
     val density = androidx.compose.ui.platform.LocalDensity.current
 
@@ -131,18 +134,7 @@ fun MainEpgScreen(viewModel: EpgViewModel) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 // 1. Broadcaster Filter & App Header
                 BroadcasterFilterBar(
-                    onNavigateToGuide = {
-                        coroutineScope.launch {
-                            repeat(20) {
-                                try {
-                                    firstChannelFocusRequester.requestFocus()
-                                    return@launch
-                                } catch (_: IllegalStateException) {
-                                }
-                                kotlinx.coroutines.delay(50)
-                            }
-                        }
-                    },
+                    onNavigateToGuide = { guideFocusRequestId++ },
                     selectedBroadcaster = state.selectedBroadcaster,
                     enabledBroadcasters = state.enabledBroadcasters,
                     onSelectBroadcaster = { broadcaster ->
@@ -165,14 +157,7 @@ fun MainEpgScreen(viewModel: EpgViewModel) {
                 HeroProgrammePane(
                     programme = state.focusedProgramme,
                     channel = state.focusedChannel,
-                    currentTimeSeconds = state.currentTimeSeconds,
-                    onWatchLiveClick = {
-                        val prog = state.focusedProgramme
-                        val ch = state.focusedChannel
-                        if (prog != null && ch != null) {
-                            viewModel.onProgrammeClick(prog, ch)
-                        }
-                    }
+                    currentTimeSeconds = state.currentTimeSeconds
                 )
             }
         }
@@ -180,6 +165,7 @@ fun MainEpgScreen(viewModel: EpgViewModel) {
         // 3. EPG Guide Grid with synchronized time header and channels column
         EpgGrid(
             firstChannelFocusRequester = firstChannelFocusRequester,
+            guideFocusRequestId = guideFocusRequestId,
             channels = state.channels,
             scheduleMap = state.scheduleMap,
             currentTimeSeconds = state.currentTimeSeconds,

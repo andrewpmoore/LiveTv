@@ -78,6 +78,7 @@ private val NowBadgeBrush = Brush.horizontalGradient(
 @Composable
 fun EpgGrid(
     firstChannelFocusRequester: FocusRequester,
+    guideFocusRequestId: Int,
     channels: List<Channel>,
     scheduleMap: Map<String, List<Programme>>,
     currentTimeSeconds: Long,
@@ -107,20 +108,38 @@ fun EpgGrid(
     val renderWindowEndSeconds = timelineStartSeconds +
         ((firstVisibleSlot + visibleSlotCount + 2).coerceAtMost(totalSlots) * SLOT_DURATION_SECONDS)
 
-    // Map of FocusRequesters for each channel's "NOW" programme
-    val nowFocusRequesters = remember { mutableMapOf<String, FocusRequester>() }
-    val offAirFocusRequesters = remember { mutableMapOf<String, FocusRequester>() }
+    // One focus target per channel, attached to its NOW programme or off-air cell.
+    // The first row changes with the broadcaster filter. Rebind its entry requester
+    // instead of retaining the requester assigned when this channel was a later row.
+    val firstChannelId = channels.firstOrNull()?.id
+    val channelFocusRequesters = remember(firstChannelId, firstChannelFocusRequester) {
+        mutableMapOf<String, FocusRequester>()
+    }
     channels.forEach { ch ->
-        if (!nowFocusRequesters.containsKey(ch.id)) {
-            nowFocusRequesters[ch.id] = if (ch == channels.firstOrNull()) firstChannelFocusRequester else FocusRequester()
-        }
-        if ((scheduleMap[ch.id] ?: emptyList()).isEmpty() && !offAirFocusRequesters.containsKey(ch.id)) {
-            offAirFocusRequesters[ch.id] = if (ch == channels.firstOrNull()) firstChannelFocusRequester else FocusRequester()
+        if (!channelFocusRequesters.containsKey(ch.id)) {
+            channelFocusRequesters[ch.id] = if (ch.id == firstChannelId) firstChannelFocusRequester else FocusRequester()
         }
     }
 
     // Pending channel target for vertical navigation between NOW programmes (starts on first channel)
     var pendingFocusChannelId by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(guideFocusRequestId) {
+        if (guideFocusRequestId == 0 || channels.isEmpty()) return@LaunchedEffect
+        // The first row may have been recycled after scrolling or changing filters.
+        pendingFocusChannelId = null
+        verticalListState.scrollToItem(0)
+        repeat(20) {
+            androidx.compose.runtime.withFrameNanos { }
+            try {
+                firstChannelFocusRequester.requestFocus()
+                return@LaunchedEffect
+            } catch (_: IllegalStateException) {
+                // Wait for LazyColumn to compose the row and attach its requester.
+            }
+            kotlinx.coroutines.delay(50)
+        }
+    }
 
     val onNavigateVerticalFromNow: (Int) -> Unit = { targetIndex ->
         val targetChannel = channels.getOrNull(targetIndex)
@@ -130,13 +149,7 @@ fun EpgGrid(
                 // Ensure target row is visible in LazyColumn
                 verticalListState.animateScrollToItem(targetIndex)
                 try {
-                    val targetHasNoSchedule = (scheduleMap[targetChannel.id] ?: emptyList()).isEmpty()
-                    val requester = if (targetHasNoSchedule) {
-                        offAirFocusRequesters[targetChannel.id]
-                    } else {
-                        nowFocusRequesters[targetChannel.id]
-                    }
-                    requester?.requestFocus()
+                    channelFocusRequesters[targetChannel.id]?.requestFocus()
                 } catch (e: Exception) {
                     // Handled by pendingFocusChannelId LaunchedEffect when composed
                 }
@@ -269,7 +282,10 @@ fun EpgGrid(
                     .weight(1f)
             ) {
                 itemsIndexed(channels, key = { _, ch -> ch.id }) { index, channel ->
-                    val programmes = scheduleMap[channel.id] ?: emptyList()
+                    val timelineEndSeconds = timelineStartSeconds + (totalSlots * SLOT_DURATION_SECONDS)
+                    val programmes = (scheduleMap[channel.id] ?: emptyList()).filter {
+                        it.endTimeEpochSeconds > timelineStartSeconds && it.startTimeEpochSeconds < timelineEndSeconds
+                    }
 
                     // Identify the designated "NOW" programme for this channel
                     val nowProgId = remember(programmes, currentTimeSeconds) {
@@ -305,7 +321,7 @@ fun EpgGrid(
                                 if (programmes.isEmpty()) {
                                     OffAirCell(
                                         channel = channel,
-                                        focusRequester = offAirFocusRequesters.getOrPut(channel.id) { FocusRequester() },
+                                        focusRequester = channelFocusRequesters.getValue(channel.id),
                                         pendingFocusChannelId = pendingFocusChannelId,
                                         onClearPendingFocus = { pendingFocusChannelId = null },
                                         channelIndex = index,
@@ -317,7 +333,6 @@ fun EpgGrid(
                                             .padding(horizontal = 8.dp)
                                     )
                                 } else {
-                                    val timelineEndSeconds = timelineStartSeconds + (totalSlots * SLOT_DURATION_SECONDS)
                                     var previousEndSeconds = timelineStartSeconds
 
                                     for (prog in programmes) {
@@ -357,7 +372,7 @@ fun EpgGrid(
                                             channelIndex = index,
                                             channelsCount = channels.size,
                                             isNowProgramme = isNow,
-                                            nowFocusRequester = if (isNow) nowFocusRequesters[channel.id] else null,
+                                            nowFocusRequester = if (isNow) channelFocusRequesters[channel.id] else null,
                                             pendingFocusChannelId = pendingFocusChannelId,
                                             onClearPendingFocus = { pendingFocusChannelId = null },
                                             onNavigateVerticalFromNow = onNavigateVerticalFromNow,

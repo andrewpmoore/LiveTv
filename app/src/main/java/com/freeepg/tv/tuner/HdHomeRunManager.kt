@@ -18,8 +18,12 @@ import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import java.io.File
 import java.io.StringReader
+import java.net.DatagramPacket
+import java.net.DatagramSocket
 import java.net.Inet4Address
 import java.net.InetAddress
+import java.net.NetworkInterface
+import java.net.SocketTimeoutException
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -456,10 +460,11 @@ class HdHomeRunManager(private val context: Context) {
     }
 
     /**
-     * Finds an HDHomeRun locally first, then falls back to SiliconDust's online discovery service.
+     * Uses local UDP discovery before hostname and cloud fallbacks. Some TVs cannot
+     * resolve .local names, and cloud discovery may return no devices on a working LAN.
      */
     suspend fun discoverTuner(): HdHomeRunDiscoverDevice? = withContext(Dispatchers.IO) {
-        val primary = discoverOnLocalNetwork() ?: discoverThroughCloud()
+        val primary = discoverByBroadcast() ?: discoverOnLocalNetwork() ?: discoverThroughCloud()
         if (primary != null) {
             prefs.edit()
                 .putString(KEY_TUNER_IP, primary.localIp)
@@ -471,8 +476,55 @@ class HdHomeRunManager(private val context: Context) {
         primary
     }
 
+    private fun discoverByBroadcast(): HdHomeRunDiscoverDevice? {
+        return try {
+            val targets = mutableSetOf(InetAddress.getByName("255.255.255.255"))
+            NetworkInterface.getNetworkInterfaces()?.let { interfaces ->
+                for (network in interfaces) {
+                    if (!network.isUp || network.isLoopback) continue
+                    network.interfaceAddresses.mapNotNullTo(targets) { it.broadcast }
+                }
+            }
+            DatagramSocket().use { socket ->
+                socket.broadcast = true
+                val request = HdHomeRunDiscoveryProtocol.request()
+                val seen = mutableSetOf<String>()
+                repeat(2) {
+                    for (target in targets) {
+                        runCatching {
+                            socket.send(DatagramPacket(request, request.size, target, HdHomeRunDiscoveryProtocol.PORT))
+                        }
+                    }
+                    val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(750)
+                    while (System.nanoTime() < deadline) {
+                        val remainingMs = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime())
+                        socket.soTimeout = remainingMs.coerceIn(1, 750).toInt()
+                        val reply = DatagramPacket(ByteArray(2048), 2048)
+                        try {
+                            socket.receive(reply)
+                        } catch (_: SocketTimeoutException) {
+                            break
+                        }
+                        if (reply.port != HdHomeRunDiscoveryProtocol.PORT || reply.address !is Inet4Address ||
+                            !HdHomeRunDiscoveryProtocol.isTunerResponse(reply.data, reply.length)) continue
+                        val ip = reply.address.hostAddress ?: continue
+                        if (!seen.add(ip)) continue
+                        readLocalDevice(ip)?.let { return it }
+                    }
+                }
+            }
+            null
+        } catch (e: Exception) {
+            Log.d(TAG, "HDHomeRun broadcast discovery unavailable: ${e.message}")
+            null
+        }
+    }
+
     private fun discoverOnLocalNetwork(): HdHomeRunDiscoverDevice? {
-        val host = "hdhomerun.local"
+        return readLocalDevice("hdhomerun.local")
+    }
+
+    private fun readLocalDevice(host: String): HdHomeRunDiscoverDevice? {
         return try {
             val request = Request.Builder()
                 .url("http://$host/discover.json")
@@ -483,9 +535,8 @@ class HdHomeRunManager(private val context: Context) {
                 if (!response.isSuccessful) return null
                 val body = response.body?.string() ?: return null
                 val device = json.decodeFromString<HdHomeRunDiscoverDevice>(body)
-                val ipAddress = device.localIp
-                    ?.takeIf { it.isNotBlank() }
-                    ?: resolveIpv4(host)
+                val ipAddress = resolveIpv4(host)
+                    ?: device.localIp?.takeIf { it.isNotBlank() }
                     ?: device.baseUrl?.let { baseUrl ->
                         runCatching { resolveIpv4(baseUrl.toHttpUrl().host) }.getOrNull()
                     }
@@ -493,7 +544,7 @@ class HdHomeRunManager(private val context: Context) {
                 device.copy(localIp = ipAddress)
             }
         } catch (e: Exception) {
-            Log.d(TAG, "Local HDHomeRun discovery unavailable: ${e.message}")
+            Log.d(TAG, "Local HDHomeRun discovery at $host unavailable: ${e.message}")
             null
         }
     }

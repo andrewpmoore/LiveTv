@@ -2,8 +2,6 @@ package com.freeepg.tv.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,7 +18,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LiveTv
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
@@ -51,7 +48,6 @@ fun HeroProgrammePane(
     programme: Programme?,
     channel: Channel?,
     currentTimeSeconds: Long,
-    onWatchLiveClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val brandColor = channel?.broadcaster?.brandColor ?: AccentCyan
@@ -73,7 +69,7 @@ fun HeroProgrammePane(
                     .padding(horizontal = 24.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left Column: Programme Metadata, Title, Synopsis, and Action Controls
+                // Left Column: Programme Metadata, Title, Synopsis, and Progress
                 Column(
                     modifier = Modifier
                         .weight(1f)
@@ -220,39 +216,12 @@ fun HeroProgrammePane(
                         )
                     }
 
-                    // Bottom Row: Watch Live Gradient Button & Progress Bar
+                    // Bottom Row: Live Progress Bar
                     if (isLive) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Small Circular Play Button
-                            Box(
-                                modifier = Modifier
-                                    .size(30.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        Brush.linearGradient(
-                                            listOf(
-                                                AccentLive,
-                                                Color(0xFFFF4060)
-                                            )
-                                        )
-                                    )
-                                    .border(0.75.dp, Color(0x66FFFFFF), CircleShape)
-                                    .clickable { onWatchLiveClick() },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = "Watch Live on ${channel.broadcaster.displayName}",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(17.dp)
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.width(14.dp))
-
                             // Progress Bar & Time Tracker
                             Column(modifier = Modifier.weight(1f)) {
                                 Row(
@@ -383,23 +352,6 @@ fun HeroProgrammePane(
                                 color = Color.White,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        // Centered subtle circular play badge on thumbnail
-                        Box(
-                            modifier = Modifier
-                                .size(34.dp)
-                                .clip(CircleShape)
-                                .background(Color(0x77000000))
-                                .border(1.dp, Color(0x66FFFFFF), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.PlayArrow,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }

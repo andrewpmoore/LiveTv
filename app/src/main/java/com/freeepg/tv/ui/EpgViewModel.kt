@@ -115,9 +115,9 @@ class EpgViewModel(application: Application) : AndroidViewModel(application) {
             }
             loadEpgData(forceRefresh = false)
 
-            if (hdHomeRunManager.getStoredTunerIp() == null) {
-                scanForTuner(silent = true)
-            }
+            // A cached lineup can still exist after DHCP changes the tuner address.
+            // Recheck discovery in the background while the cached guide remains usable.
+            scanForTuner(silent = true)
         }
     }
 

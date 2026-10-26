@@ -5,6 +5,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.Bundle
 import android.view.WindowManager
+import android.view.ViewGroup
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -37,12 +38,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -112,6 +115,8 @@ private fun TunerPlayerScreen(
 ) {
     val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
+    val hideChannelFocusRequester = remember { FocusRequester() }
+    var isHideChannelFocused by remember { mutableStateOf(false) }
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
     var playerError by remember { mutableStateOf<String?>(null) }
@@ -122,6 +127,12 @@ private fun TunerPlayerScreen(
     var showDetails by remember { mutableStateOf(true) }
     var interaction by remember { mutableIntStateOf(0) }
     var nowSeconds by remember { mutableStateOf(System.currentTimeMillis() / 1000L) }
+    val canHideChannel = (playerError != null || bufferingTimedOut) &&
+        weakSignalDetected && channelId.isNotBlank()
+    val hideChannelFromGuide = {
+        SettingsRepository(context).setTunerChannelHidden(channelId, true)
+        onBack()
+    }
 
     val libVlc = remember(streamUrl) {
         LibVLC(context.applicationContext, arrayListOf("--network-caching=1200", "--clock-jitter=0"))
@@ -162,8 +173,12 @@ private fun TunerPlayerScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
+    LaunchedEffect(canHideChannel) {
+        if (canHideChannel) {
+            hideChannelFocusRequester.requestFocus()
+        } else {
+            focusRequester.requestFocus()
+        }
     }
 
     // Buffering timeout watcher: If tuning takes over 7s, antenna signal is likely missing
@@ -200,16 +215,27 @@ private fun TunerPlayerScreen(
             .background(Color.Black)
             .focusRequester(focusRequester)
             .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown &&
+                    (event.key == Key.Back || event.key == Key.Escape)) {
+                    onBack()
+                    true
+                } else false
+            }
+            // Handle selection after the focused child has had a chance to click.
+            .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown) {
                     when (event.key) {
-                        Key.DirectionCenter, Key.Enter -> {
+                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.ButtonA -> {
                             showDetails = true
                             interaction++
+                            if (canHideChannel) hideChannelFocusRequester.requestFocus()
                             true
                         }
-                        Key.Back, Key.Escape -> {
-                            onBack()
-                            true
+                        Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight -> {
+                            if (canHideChannel) {
+                                hideChannelFocusRequester.requestFocus()
+                                true
+                            } else false
                         }
                         else -> false
                     }
@@ -221,6 +247,10 @@ private fun TunerPlayerScreen(
             modifier = Modifier.fillMaxSize(),
             factory = { viewContext ->
                 VLCVideoLayout(viewContext).also { layout ->
+                    // Playback surfaces must not steal controller focus from Compose actions.
+                    layout.isFocusable = false
+                    layout.isFocusableInTouchMode = false
+                    layout.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
                     player.attachViews(layout, null, true, false)
                     val media = Media(libVlc, Uri.parse(streamUrl))
                     player.setMedia(media)
@@ -328,17 +358,26 @@ private fun TunerPlayerScreen(
                         Text(it, color = Color(0xFFFF8A80), fontSize = 15.sp, fontWeight = FontWeight.Medium)
                         Spacer(Modifier.height(10.dp))
                     }
-                    if (weakSignalDetected && channelId.isNotBlank()) {
+                    if (canHideChannel) {
                         Spacer(Modifier.height(10.dp))
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFF8B2635),
+                            color = if (isHideChannelFocused) Color(0xFFBB364B) else Color(0xFF8B2635),
                             modifier = Modifier
-                                .clickable {
-                                    SettingsRepository(context).setTunerChannelHidden(channelId, true)
-                                    onBack()
+                                .focusRequester(hideChannelFocusRequester)
+                                .onFocusChanged { isHideChannelFocused = it.isFocused }
+                                .onKeyEvent { event ->
+                                    if (event.key == Key.ButtonA) {
+                                        if (event.type == KeyEventType.KeyUp) hideChannelFromGuide()
+                                        true
+                                    } else false
                                 }
-                                .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
+                                .clickable(onClick = hideChannelFromGuide)
+                                .border(
+                                    if (isHideChannelFocused) 3.dp else 1.dp,
+                                    if (isHideChannelFocused) Color.White else Color.White.copy(alpha = 0.35f),
+                                    RoundedCornerShape(8.dp)
+                                )
                         ) {
                             Text(
                                 text = "Hide this channel from the guide",

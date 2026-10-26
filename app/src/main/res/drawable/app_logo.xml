@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Transparent, tightly framed version of the launcher mark for the EPG. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="40dp"
+    android:height="40dp"
+    android:viewportWidth="570"
+    android:viewportHeight="570">
+    <group android:translateX="-363" android:translateY="-327">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M375,833 L375,482 C375,434 415,405 457,429 L764,606 C803,629 803,681 764,704 L459,882 C418,906 375,883 375,833 Z" />
+        <path
+            android:fillColor="#FF176A"
+            android:pathData="M922,441 A102,102 0,1 1,718,441 A102,102 0,1 1,922,441 Z" />
+    </group>
+</vector>
