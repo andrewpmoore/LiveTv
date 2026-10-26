@@ -19,7 +19,7 @@ Live TV is a UK electronic programme guide (EPG) for Android TV and Google TV. B
 - Filters for BBC iPlayer, ITVX, Channel 4, Channel 5 / My5, U / UKTV, and TV Tuner.
 - Optional HDHomeRun discovery and tuner streams, with broadcaster-app links preferred for channels available in both places.
 - Live listings from Sky's schedule service, with an EPGshare UK XMLTV fallback for channels whose schedule does not cover the next 24 hours.
-- Channel order preferences: by channel number, provider, or alphabetically. New installs default to channel number.
+- Channel order preferences: by provider, channel number, or alphabetically. New installs default to provider.
 - Optional accessibility service for automating navigation in supported broadcaster apps after selecting a live programme.
 - Cached programme data to make the guide useful when the network is unavailable.
 - Atkinson Hyperlegible typography for clearer letter and number shapes at TV viewing distance.

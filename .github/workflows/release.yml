@@ -95,6 +95,7 @@ jobs:
             - HDHomeRun tuner discovery with native LibVLC playback for broadcast formats.
             - Choose the built-in tuner player or an installed external player in Settings.
             - Hide weak-signal tuner channels from the guide and restore them later.
+            - Channel guide defaults to grouping channels by provider.
             - 10-foot TV UI optimized for D-pad remote controls.
           draft: false
           prerelease: false

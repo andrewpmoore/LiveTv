@@ -24,7 +24,7 @@ import kotlinx.coroutines.launch
 data class EpgUiState(
     val selectedBroadcaster: Broadcaster? = null,
     val enabledBroadcasters: Set<Broadcaster> = SettingsRepository.DEFAULT_BROADCASTERS,
-    val channelSortOrder: ChannelSortOrder = ChannelSortOrder.NUMBER,
+    val channelSortOrder: ChannelSortOrder = ChannelSortOrder.PROVIDER,
     val showAdultChannels: Boolean = SettingsRepository.DEFAULT_SHOW_ADULT_CHANNELS,
     val channels: List<Channel> = Channel.ALL_CHANNELS,
     val scheduleMap: Map<String, List<Programme>> = emptyMap(),
